@@ -16,6 +16,8 @@ import lombok.Data;
 public class Flow {
     private final static String separator = ",";
 
+	private long processStartTime;
+
 	private     SummaryStatistics 		fwdPktStats = null;
 	private		SummaryStatistics 		bwdPktStats = null;
 	private 	List<PacketInfo> 	forward = null;
@@ -65,7 +67,16 @@ public class Flow {
     private     long   backwardLastSeen;
     private     long   activityTimeout;
 
-	public Flow(boolean isBidirectional,PacketInfo packet, byte[] flowSrc, byte[] flowDst, int flowSrcPort, int flowDstPort, long activityTimeout) {
+	public Flow(
+			long processStartTime,
+			boolean isBidirectional,
+			PacketInfo packet,
+			byte[] flowSrc,
+			byte[] flowDst,
+			int flowSrcPort,
+			int flowDstPort,
+			long activityTimeout) {
+		this.processStartTime = processStartTime;
 		this.activityTimeout = activityTimeout;
 		this.initParameters();
 		this.isBidirectional = isBidirectional;
@@ -76,14 +87,16 @@ public class Flow {
 		this.dstPort = flowDstPort;
 	}    
     
-	public Flow(boolean isBidirectional, PacketInfo packet, long activityTimeout) {
+	public Flow(long processStartTime, boolean isBidirectional, PacketInfo packet, long activityTimeout) {
+		this.processStartTime = processStartTime;
 		this.activityTimeout = activityTimeout;
 		this.initParameters();
 		this.isBidirectional = isBidirectional;
 		this.firstPacket(packet);
 	}
 
-	public Flow(PacketInfo packet, long activityTimeout) {
+	public Flow(long processStartTime, PacketInfo packet, long activityTimeout) {
+		this.processStartTime = processStartTime;
 		this.activityTimeout = activityTimeout;
 		this.initParameters();
 		this.isBidirectional = true;		

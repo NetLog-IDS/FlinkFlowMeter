@@ -12,6 +12,7 @@ import org.apache.flink.util.Collector;
 
 import id.ac.ui.cs.netlog.data.cicflowmeter.Flow;
 import id.ac.ui.cs.netlog.data.cicflowmeter.PacketInfo;
+import id.ac.ui.cs.netlog.utils.TimeUtils;
 
 public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow> {
     //total 85 colums
@@ -61,15 +62,10 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
         if (packet == null) return;
 
 		Flow flow = flowState.value();
+		Long currentInstanceTimestamp = TimeUtils.getCurrentTimeMicro();
+		System.out.println("CURRENT TIME: " + currentInstanceTimestamp.toString());
     	if (flow != null) {
             Long currentTimestamp = packet.getTimeStamp();
-
-            // String id;
-			// if (flow.hasSameDirection(packet)) {
-			// 	id = packet.fwdFlowId();
-			// } else {
-			// 	id = packet.bwdFlowId();
-			// }
 
     		// Flow flow = currentFlows.get(id);
     		if ((currentTimestamp - flow.getFlowStartTime()) > FLOW_TIMEOUT) {
@@ -81,6 +77,7 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
     			if (flow.packetCount() > 1) out.collect(flow);
 
 				flowState.update(new Flow(
+					currentInstanceTimestamp,
 					bidirectional,
 					packet,
 					flow.getSrc(),
@@ -89,17 +86,9 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 					flow.getDstPort(),
 					ACTIVITY_TIMEOUT
 				));
-                
-    			// currentFlows.remove(id);    			
-				// currentFlows.put(id, new Flow(
-                //         bidirectional,
-                //         packet,
-                //         flow.getSrc(),
-                //         flow.getDst(),
-                //         flow.getSrcPort(),
-                //         flow.getDstPort(),
-                //         ACTIVITY_TIMEOUT
-                //     ));
+				System.out.println("TRIGGERING TIMER SERVICE");
+				long triggerTime = ctx.timerService().currentProcessingTime() + (FLOW_TIMEOUT / 1000L);
+				ctx.timerService().registerProcessingTimeTimer(triggerTime);
     		} else if (packet.isFlagFIN()) {
                 // Flow finished due FIN flag (tcp only):
                 // 1.- we add the packet-in-process to the flow (it is the last packet)
@@ -119,12 +108,10 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
     		    	    	flow.addPacket(packet);
                             out.collect(flow);
 							flowState.update(null);
-    		                // currentFlows.remove(id);
     					} else {
     		    			flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
     		    			flow.addPacket(packet);
 							flowState.update(flow);
-    		    			// currentFlows.put(id,flow);    						
     					}
     				} else {
                         // Some Error
@@ -143,12 +130,10 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
     		    	    	flow.addPacket(packet);
     		                out.collect(flow);
 							flowState.update(null);
-    		                // currentFlows.remove(id);
     					} else {
     		    			flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
     		    			flow.addPacket(packet);
 							flowState.update(flow);
-    		    			// currentFlows.put(id,flow);
     					}
     				} else {
     					// Some Error
@@ -163,58 +148,59 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
     			flow.addPacket(packet);
                 out.collect(flow);
 				flowState.update(null);
-                // currentFlows.remove(id);    			
     		}else{
     			if (Arrays.equals(flow.getSrc(), packet.getSrc()) && (flow.getFwdFINFlags() == 0)) {
                     // Forward Flow and fwdFIN = 0
         			flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
         			flow.addPacket(packet);
 					flowState.update(flow);
-        			// currentFlows.put(id,flow);
     			} else if (flow.getBwdFINFlags() == 0) {
     			    // Backward Flow and bwdFIN = 0
         			flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
         			flow.addPacket(packet);
 					flowState.update(flow);
-        			// currentFlows.put(id,flow);
     			} else {
         		    // FLOW already closed!!!
     			}
     		}
     	} else {
+			// TODO: make fwd and bwd have same key
 			flowState.update(new Flow(
+				currentInstanceTimestamp,
 				bidirectional,
 				packet,
 				ACTIVITY_TIMEOUT
 			));
-			// TODO: make fwd and bwd have same key
-			// currentFlows.put(packet.fwdFlowId(), new Flow(bidirectional,packet, ACTIVITY_TIMEOUT));
+			System.out.println("TRIGGERING TIMER SERVICE");
+			long triggerTime = ctx.timerService().currentProcessingTime() + (FLOW_TIMEOUT / 1000L);
+			ctx.timerService().registerProcessingTimeTimer(triggerTime);
     	}
-
-		System.out.println("TRIGGERING TIMER SERVICE");
-		long triggerTime = ctx.timerService().currentProcessingTime() + (FLOW_TIMEOUT / 1000L);
-		ctx.timerService().registerProcessingTimeTimer(triggerTime);
     }
 
 	// TODO: there's concern about unsynchronized time which makes timestamp - flow.getFlowStartTime() < 0
     @Override
     public void onTimer(long timestamp, OnTimerContext ctx, Collector<Flow> out) throws Exception {
-		System.out.println("==TIME TRIGGER START");
+		Long timestampMicro = timestamp * 1000L;
 
+		System.out.println("==TIME TRIGGER START");
 		Flow flow = flowState.value();
 		if (flow == null) return;
+
+		System.out.println(timestampMicro.toString() + " - " + flow.getProcessStartTime());
 
 		// Flow finished due flowtimeout: 
 		// 1.- we move the flow to finished flow list
 		// 2.- we eliminate the flow from the current flow list
 		// 3.- we create a new flow with the packet-in-process
-
-		System.out.println(flow.packetCount());
-		if (flow.packetCount() > 1) {
-			System.out.println("COLLECTED");
-			out.collect(flow);
+		if ((timestampMicro - flow.getProcessStartTime()) > FLOW_TIMEOUT) {
+			System.out.println(flow.packetCount());
+			if (flow.packetCount() > 1) {
+				System.out.println("COLLECTED");
+				out.collect(flow);
+			}
+			flowState.update(null);
 		}
-		flowState.update(null);
+
 		System.out.println("==TIME TRIGGER END");
     }
 }
