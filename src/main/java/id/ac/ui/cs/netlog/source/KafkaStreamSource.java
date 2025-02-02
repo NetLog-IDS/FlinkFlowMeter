@@ -31,6 +31,7 @@ public class KafkaStreamSource implements StreamSource {
 		this.objectMapper = objectMapper;
     }
 
+	@Override
     public DataStream<Packet> getSourceStream() {
 		KafkaSource<Packet> source = KafkaSource.<Packet>builder()
 			.setBootstrapServers(this.servers)

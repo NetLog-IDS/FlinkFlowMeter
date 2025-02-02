@@ -25,6 +25,7 @@ public class SocketStreamSource implements StreamSource {
 		this.objectMapper = objectMapper;
     }
 
+    @Override
     public DataStream<Packet> getSourceStream() {
 		return env.socketTextStream(host, port).map(new PacketParser(objectMapper));
 	}
