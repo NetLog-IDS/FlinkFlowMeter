@@ -75,6 +75,9 @@ public class PacketInfo {
     	for (int i = 0; i < this.src.length; i++) {   
 			int srcByte = ((Byte)(this.src[i])).intValue();	      
 			int dstByte = ((Byte)(this.dst[i])).intValue();
+			System.out.println(srcByte);
+			System.out.println(">");
+			System.out.println(dstByte);
     		if (srcByte > dstByte) {
 				forward = false;
 				break;

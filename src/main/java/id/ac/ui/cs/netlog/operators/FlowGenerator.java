@@ -61,14 +61,17 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
             throws Exception {
         if (packet == null) return;
 
+		System.out.println("=== PACKET START FOR " + packet.getFlowBidirectionalId() + " ===");
+
 		Flow flow = flowState.value();
 		Long currentInstanceTimestamp = TimeUtils.getCurrentTimeMicro();
-		System.out.println("CURRENT TIME: " + currentInstanceTimestamp.toString());
+		// System.out.println("CURRENT TIME: " + currentInstanceTimestamp.toString());
     	if (flow != null) {
             Long currentTimestamp = packet.getTimeStamp();
 
     		// Flow flow = currentFlows.get(id);
     		if ((currentTimestamp - flow.getFlowStartTime()) > FLOW_TIMEOUT) {
+				System.out.println(packet.getFlowBidirectionalId() + " TIMEOUTS");
                 // Flow finished due flowtimeout: 
                 // 1.- we move the flow to finished flow list
                 // 2.- we eliminate the flow from the current flow list
@@ -86,7 +89,7 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 					flow.getDstPort(),
 					ACTIVITY_TIMEOUT
 				));
-				System.out.println("TRIGGERING TIMER SERVICE");
+				System.out.println(packet.getFlowBidirectionalId()+ " TRIGGERING TIMER SERVICE");
 				long triggerTime = ctx.timerService().currentProcessingTime() + (FLOW_TIMEOUT / 1000L);
 				ctx.timerService().registerProcessingTimeTimer(triggerTime);
     		} else if (packet.isFlagFIN()) {
@@ -104,17 +107,20 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
     		        	// 2.- we move the flow to finished flow list
     		        	// 3.- we eliminate the flow from the current flow list       					
     					if ((flow.getBwdFINFlags() + flow.getBwdFINFlags()) == 2) {
+							System.out.println(packet.getFlowBidirectionalId() + " FWD 2 TRUE");
                             // Forward Flow Finished.
     		    	    	flow.addPacket(packet);
                             out.collect(flow);
 							flowState.update(null);
     					} else {
+							System.out.println(packet.getFlowBidirectionalId() + " FWD 2 ELSE");
     		    			flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
     		    			flow.addPacket(packet);
 							flowState.update(flow);
     					}
     				} else {
                         // Some Error
+						System.out.println(packet.getFlowBidirectionalId() + " FWD SOME ERROR");
                     }
     			} else {
                     // Backward Flow
@@ -126,20 +132,24 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
     		        	// 2.- we move the flow to finished flow list
     		        	// 3.- we eliminate the flow from the current flow list       					
     					if ((flow.getBwdFINFlags() + flow.getBwdFINFlags()) == 2) {
+							System.out.println(packet.getFlowBidirectionalId() + " BWD 2 TRUE");
                             // Backward Flow Finished.
     		    	    	flow.addPacket(packet);
     		                out.collect(flow);
 							flowState.update(null);
     					} else {
+							System.out.println(packet.getFlowBidirectionalId() + " BWD 2 ELSE");
     		    			flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
     		    			flow.addPacket(packet);
 							flowState.update(flow);
     					}
     				} else {
     					// Some Error
+						System.out.println(packet.getFlowBidirectionalId() + " BWD SOME ERROR");
     				}    				
     			}               
     		}else if(packet.isFlagRST()) {
+				System.out.println("RST");
                 // Flow finished due RST flag (tcp only):
                 // 1.- we add the packet-in-process to the flow (it is the last packet)
                 // 2.- we move the flow to finished flow list
@@ -150,20 +160,24 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 				flowState.update(null);
     		}else{
     			if (Arrays.equals(flow.getSrc(), packet.getSrc()) && (flow.getFwdFINFlags() == 0)) {
+					System.out.println(packet.getFlowBidirectionalId() + " FWD UWOO");
                     // Forward Flow and fwdFIN = 0
         			flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
         			flow.addPacket(packet);
 					flowState.update(flow);
     			} else if (flow.getBwdFINFlags() == 0) {
+					System.out.println(packet.getFlowBidirectionalId() + " BWD UWOO");
     			    // Backward Flow and bwdFIN = 0
         			flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
         			flow.addPacket(packet);
 					flowState.update(flow);
     			} else {
         		    // FLOW already closed!!!
+					System.out.println(packet.getFlowBidirectionalId() + " CLOSEEE");
     			}
     		}
     	} else {
+			System.out.println(packet.getFlowBidirectionalId() + " SIIEEEE");
 			// TODO: make fwd and bwd have same key
 			flowState.update(new Flow(
 				currentInstanceTimestamp,
@@ -171,28 +185,32 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 				packet,
 				ACTIVITY_TIMEOUT
 			));
-			System.out.println("TRIGGERING TIMER SERVICE");
+			System.out.println(packet.getFlowBidirectionalId()+ " TRIGGERING TIMER SERVICE");
 			long triggerTime = ctx.timerService().currentProcessingTime() + (FLOW_TIMEOUT / 1000L);
 			ctx.timerService().registerProcessingTimeTimer(triggerTime);
     	}
+
+		System.out.println("=== PACKET ENDED FOR " + packet.getFlowBidirectionalId() + " ===");
     }
 
 	// TODO: there's concern about unsynchronized time which makes timestamp - flow.getFlowStartTime() < 0
     @Override
     public void onTimer(long timestamp, OnTimerContext ctx, Collector<Flow> out) throws Exception {
-		Long timestampMicro = timestamp * 1000L;
+		// Long timestampMicro = timestamp * 1000L;
 
 		System.out.println("==TIME TRIGGER START");
 		Flow flow = flowState.value();
 		if (flow == null) return;
 
-		System.out.println(timestampMicro.toString() + " - " + flow.getProcessStartTime());
+		Long processStarTimeMilli = flow.getProcessStartTime() / 1000L;
+
+		System.out.println(((Long) timestamp).toString() + " - " + processStarTimeMilli);
 
 		// Flow finished due flowtimeout: 
 		// 1.- we move the flow to finished flow list
 		// 2.- we eliminate the flow from the current flow list
 		// 3.- we create a new flow with the packet-in-process
-		if ((timestampMicro - flow.getProcessStartTime()) > FLOW_TIMEOUT) {
+		if ((timestamp - processStarTimeMilli) >= (FLOW_TIMEOUT / 1000L)) {
 			System.out.println(flow.packetCount());
 			if (flow.packetCount() > 1) {
 				System.out.println("COLLECTED");

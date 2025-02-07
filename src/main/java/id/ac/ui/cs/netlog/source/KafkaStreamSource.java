@@ -13,9 +13,9 @@ import id.ac.ui.cs.netlog.data.packets.Packet;
 import id.ac.ui.cs.netlog.serialization.deserializers.PacketDeserializationSchema;
 
 public class KafkaStreamSource implements StreamSource {
-    private static final String SOURCE_KAFKA_SERVERS = "source-servers";
-	private static final String SOURCE_KAFKA_TOPIC = "source-topic";
-	private static final String SOURCE_GROUP_ID = "source-group";
+    private static final String KAFKA_SERVERS = "source-servers";
+	private static final String KAFKA_TOPIC = "source-topic";
+	private static final String GROUP_ID = "source-group";
 
     private final String servers;
     private final String topic;
@@ -24,9 +24,12 @@ public class KafkaStreamSource implements StreamSource {
 	private final ObjectMapper objectMapper;
 
     public KafkaStreamSource(StreamExecutionEnvironment env, ParameterTool parameters, ObjectMapper objectMapper) {
-        this.servers = parameters.get(SOURCE_KAFKA_SERVERS, "localhost:9200");
-        this.topic = parameters.get(SOURCE_KAFKA_TOPIC, "network-traffic");
-		this.groupId = parameters.get(SOURCE_GROUP_ID, "flink-1");
+        this.servers = parameters.get(KAFKA_SERVERS, "localhost:9200");
+        this.topic = parameters.get(KAFKA_TOPIC, "network-traffic");
+		this.groupId = parameters.get(GROUP_ID, "flink-1");
+		System.out.println(this.servers);
+		System.out.println(this.topic);
+		System.out.println(this.groupId);
 		this.env = env;
 		this.objectMapper = objectMapper;
     }

@@ -31,13 +31,18 @@ public class StreamingJob {
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
 		String sourceString = parameters.get(SOURCE_TYPE, StreamSourceEnum.SOCKET.toString());
+		System.out.println(sourceString);
 
 		StreamSourceFactory factory = new StreamSourceFactory(objectMapper);
 		StreamSource source = factory.getStreamSource(StreamSourceEnum.fromString(sourceString), env, parameters);
 
         DataStream<FlowStats> stream = source.getSourceStream()
 				.map(new ExtractPacketInfo())
-				.keyBy(packetInfo -> packetInfo.getFlowBidirectionalId())
+				.keyBy(packetInfo -> {
+					String id = packetInfo.getFlowBidirectionalId();
+					System.out.println(id);
+					return id;
+				})
 				.process(new FlowGenerator(true))
 				.map(new ExtractFlowStats());
 		
