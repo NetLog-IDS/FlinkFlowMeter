@@ -202,7 +202,9 @@ public class Flow {
 				if(packet.getPayloadBytes() >=1){
 					this.Act_data_pkt_forward++;
 				}
+				System.out.println("Adding Fwd Packet for " + this.flowId + ". Current N" + ((Long) this.fwdPktStats.getN()).toString());
 				this.fwdPktStats.addValue((double)packet.getPayloadBytes());
+				System.out.println("Result of adding Fwd Packet for " + this.flowId + ". Current N" + ((Long) this.fwdPktStats.getN()).toString());
 				this.fHeaderBytes +=packet.getHeaderBytes();
     			this.forward.add(packet);   
     			this.forwardBytes+=packet.getPayloadBytes();
@@ -212,7 +214,9 @@ public class Flow {
 				this.min_seg_size_forward = Math.min(packet.getHeaderBytes(),this.min_seg_size_forward);
 
     		}else{
+				System.out.println("Adding Bwd Packet for " + this.flowId + ". Current N" + ((Long) this.bwdPktStats.getN()).toString());
 				this.bwdPktStats.addValue((double)packet.getPayloadBytes());
+				System.out.println("Result of adding Bwd Packet for " + this.flowId + ". Current N" + ((Long) this.bwdPktStats.getN()).toString());
 				Init_Win_bytes_backward = packet.getTCPWindow();
 				this.bHeaderBytes+=packet.getHeaderBytes();
     			this.backward.add(packet);
@@ -221,8 +225,7 @@ public class Flow {
     				this.backwardIAT.addValue(currentTimestamp-this.backwardLastSeen);
     			this.backwardLastSeen = currentTimestamp;
     		}
-    	}
-		else{
+    	} else {
 			if(packet.getPayloadBytes() >=1) {
 				this.Act_data_pkt_forward++;
 			}

@@ -6,6 +6,9 @@ import lombok.Data;
 
 @Data
 public class Packet {
+    @JsonProperty("id")
+    private String id;
+
     @JsonProperty("timestamp")
     private Long timestamp;
 
