@@ -112,7 +112,6 @@ public class OrderPackets extends KeyedProcessFunction<String, PacketInfo, List<
 					state.getPacketArrival().remove(packet);
 				}
 				out.collect(submittedList);
-				state.setHasTimer(Boolean.FALSE);
 				isSubmitted = Boolean.TRUE;
 			}
 		}
@@ -132,14 +131,14 @@ public class OrderPackets extends KeyedProcessFunction<String, PacketInfo, List<
 		OrderProcessingState state,
 		KeyedProcessFunction<String, PacketInfo, List<PacketInfo>>.Context ctx
 	) throws Exception {
-		if (state.getHasTimer()) return;
+		if (state.getTimerStartOrder() >= state.getSubmittedOrder() + 1) return;
 
 		PacketInfo earliestPacket = state.getPacketArrival().first();
 		Long diff = Math.max((FLOW_TIMEOUT / 1000L) - earliestPacket.getArrivalTime(), 0);
 		long triggerTime = ctx.timerService().currentProcessingTime() + diff;
 
 		ctx.timerService().registerProcessingTimeTimer(triggerTime);
-		state.setHasTimer(Boolean.TRUE);
+		state.setTimerStartOrder(state.getSubmittedOrder() + 1);
 	}
 
 	private Long getOrderOfEarliestFinPair(OrderProcessingState state) throws Exception {

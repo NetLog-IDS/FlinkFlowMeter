@@ -18,7 +18,7 @@ public class OrderProcessingState {
     private Queue<Long> finFwdQueue;
     private Queue<Long> finBwdQueue;
     private Queue<Long> rstQueue;
-    private Boolean hasTimer;
+    private Long timerStartOrder;
 
     public OrderProcessingState() {
         packetSet = new TreeSet<>(new OrderComparator());
@@ -27,6 +27,6 @@ public class OrderProcessingState {
 		finFwdQueue = new PriorityQueue<>();
         finBwdQueue = new PriorityQueue<>();
         rstQueue = new PriorityQueue<>();
-        hasTimer = Boolean.FALSE;
+        timerStartOrder = -1L;
     }
 }
