@@ -1,5 +1,6 @@
 package id.ac.ui.cs.netlog.operators;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.NavigableSet;
 import java.util.Queue;
@@ -11,6 +12,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
+import org.apache.kafka.common.protocol.types.Field.Bool;
 
 import id.ac.ui.cs.netlog.data.cicflowmeter.PacketInfo;
 import id.ac.ui.cs.netlog.operators.states.OrderProcessingState;
@@ -46,16 +48,11 @@ public class OrderPackets extends KeyedProcessFunction<String, PacketInfo, List<
 		if (packet.getOrder() <= submittedOrder) return;
 
 		addPacketToCollections(packet, state);
-		submitUntilOrder(state);
-		addTimeoutIfNeeded(state, ctx);
+		while (true) if (!submitIfCompleted(state, ctx, out)) break;
+		addTimeoutIfNeeded(state, ctx); // TODO: add based on earliest arrival
 
 		processingState.update(state);
     }
-
-	// TODO: submit must reset hasTimer
-	private void submitPackets() throws Exception {
-
-	}
 
 	@Override
     public void onTimer(long timestamp, OnTimerContext ctx, Collector<List<PacketInfo>> out) throws Exception {
@@ -97,17 +94,31 @@ public class OrderPackets extends KeyedProcessFunction<String, PacketInfo, List<
 		}
 	}
 
-	private void submitUntilOrder(OrderProcessingState state) throws Exception {
+	// TODO: submit must reset hasTimer
+	private Boolean submitIfCompleted(OrderProcessingState state, KeyedProcessFunction<String, PacketInfo, List<PacketInfo>>.Context ctx, Collector<List<PacketInfo>> out) throws Exception {
+		Boolean isSubmitted = Boolean.FALSE;
 		Long lastOrder = getEarliestSubmittableOrder(state);
+
 		if (lastOrder != null) {
 			PacketInfo comparator = PacketInfo.getOrderComparator(lastOrder);
 			Long packetCount = lastOrder - state.getSubmittedOrder() + 1;
 			
 			NavigableSet<PacketInfo> submittingPackets = state.getPacketSet().headSet(comparator, true);
 			if (submittingPackets.size() == packetCount) {
-				submitPackets();
+				state.setSubmittedOrder(lastOrder);
+				List<PacketInfo> submittedList = new ArrayList<>();
+				for (PacketInfo packet : submittingPackets) {
+					submittedList.add(packet);
+					state.getPacketSet().remove(packet);
+					state.getPacketArrival().remove(packet);
+				}
+				out.collect(submittedList);
+				state.setHasTimer(Boolean.FALSE);
+				isSubmitted = Boolean.TRUE;
 			}
 		}
+
+		return isSubmitted;
 	}
 
 	private Long getEarliestSubmittableOrder(OrderProcessingState state) throws Exception {

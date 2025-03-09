@@ -6,7 +6,7 @@ import id.ac.ui.cs.netlog.utils.PacketUtils;
 import lombok.Data;
 
 @Data
-public class PacketInfo implements Comparable<PacketInfo> {
+public class PacketInfo {
 	private long order;
 	private String publisherId;
     private byte[] src;
@@ -131,16 +131,5 @@ public class PacketInfo implements Comparable<PacketInfo> {
 
 	public boolean isForwardPacket(byte[] sourceIP) {
 		return Arrays.equals(sourceIP, this.src);
-	}
-
-	@Override
-	public int compareTo(PacketInfo other) {
-		if (this.order > other.order) {
-			return 1;
-		} else if (this.order < other.order) {
-			return -1;
-		} else {
-			return 0;
-		}
 	}
 }
