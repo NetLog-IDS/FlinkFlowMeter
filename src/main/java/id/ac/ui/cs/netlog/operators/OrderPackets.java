@@ -12,7 +12,6 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
-import org.apache.kafka.common.protocol.types.Field.Bool;
 
 import id.ac.ui.cs.netlog.data.cicflowmeter.PacketInfo;
 import id.ac.ui.cs.netlog.operators.states.OrderProcessingState;
@@ -49,7 +48,7 @@ public class OrderPackets extends KeyedProcessFunction<String, PacketInfo, List<
 
 		addPacketToCollections(packet, state);
 		while (true) if (!submitIfCompleted(state, ctx, out)) break;
-		addTimeoutIfNeeded(state, ctx); // TODO: add based on earliest arrival
+		addTimeoutIfNeeded(state, ctx);
 
 		processingState.update(state);
     }
@@ -135,7 +134,10 @@ public class OrderPackets extends KeyedProcessFunction<String, PacketInfo, List<
 	) throws Exception {
 		if (state.getHasTimer()) return;
 
-		long triggerTime = ctx.timerService().currentProcessingTime() + (FLOW_TIMEOUT / 1000L);
+		PacketInfo earliestPacket = state.getPacketArrival().first();
+		Long diff = Math.max((FLOW_TIMEOUT / 1000L) - earliestPacket.getArrivalTime(), 0);
+		long triggerTime = ctx.timerService().currentProcessingTime() + diff;
+
 		ctx.timerService().registerProcessingTimeTimer(triggerTime);
 		state.setHasTimer(Boolean.TRUE);
 	}

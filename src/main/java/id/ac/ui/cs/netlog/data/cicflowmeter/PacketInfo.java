@@ -8,6 +8,8 @@ import lombok.Data;
 @Data
 public class PacketInfo {
 	private long order;
+	private long arrivalTime;
+	
 	private String publisherId;
     private byte[] src;
     private byte[] dst;

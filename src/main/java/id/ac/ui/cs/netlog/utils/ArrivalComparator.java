@@ -7,9 +7,9 @@ import id.ac.ui.cs.netlog.data.cicflowmeter.PacketInfo;
 public class ArrivalComparator implements Comparator<PacketInfo> {
     @Override
     public int compare(PacketInfo arg0, PacketInfo arg1) {
-        if (arg0.getOrder() > arg1.getOrder()) {
+        if (arg0.getArrivalTime() > arg1.getArrivalTime()) {
             return 1;
-        } else if (arg0.getOrder() < arg1.getOrder()) {
+        } else if (arg0.getArrivalTime() < arg1.getArrivalTime()) {
             return -1;
         } else {
             return 0;
