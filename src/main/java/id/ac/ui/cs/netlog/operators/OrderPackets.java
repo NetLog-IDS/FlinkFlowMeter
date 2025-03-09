@@ -55,30 +55,36 @@ public class OrderPackets extends KeyedProcessFunction<String, PacketInfo, List<
 
 	@Override
     public void onTimer(long timestamp, OnTimerContext ctx, Collector<List<PacketInfo>> out) throws Exception {
-		// Long timestampMicro = timestamp * 1000L;
+		OrderProcessingState state = processingState.value();
+		state.setTimerTimestamp(null);
+		Long lastOrder = getEarliestSubmittableOrder(state);
 
-		// System.out.println("==TIME TRIGGER START");
-		// Flow flow = flowState.value();
-		// if (flow == null) return;
+		if (lastOrder != null) {
+			PacketInfo comparator = PacketInfo.getOrderComparator(lastOrder);
+			NavigableSet<PacketInfo> submittingPackets = state.getPacketSet().headSet(comparator, true);
 
-		// Long processStarTimeMilli = flow.getProcessStartTime() / 1000L;
+			state.setSubmittedOrder(lastOrder);
+			List<PacketInfo> submittedList = new ArrayList<>();
+			for (PacketInfo packet : submittingPackets) {
+				submittedList.add(packet);
+				state.getPacketSet().remove(packet);
+				state.getPacketArrival().remove(packet);
+			}
+			out.collect(submittedList);
+		} else {
+			// TODO: choose whether to discard or just submit
+			PacketInfo lastPacket = state.getPacketSet().last();
+			state.setSubmittedOrder(lastPacket.getOrder());
 
-		// System.out.println(((Long) timestamp).toString() + " - " + processStarTimeMilli);
+			state.getPacketSet().clear();
+			state.getPacketArrival().clear();
+			state.getFinFwdQueue().clear();
+			state.getFinBwdQueue().clear();
+			state.getRstQueue().clear();
+		}
 
-		// // Flow finished due flowtimeout: 
-		// // 1.- we move the flow to finished flow list
-		// // 2.- we eliminate the flow from the current flow list
-		// // 3.- we create a new flow with the packet-in-process
-		// if ((timestamp - processStarTimeMilli) >= (FLOW_TIMEOUT / 1000L)) {
-		// 	System.out.println(flow.packetCount());
-		// 	if (flow.packetCount() > 1) {
-		// 		System.out.println("COLLECTED");
-		// 		out.collect(flow);
-		// 	}
-		// 	flowState.update(null);
-		// }
-
-		// System.out.println("==TIME TRIGGER END");
+		while (true) if (!submitIfCompleted(state, ctx, out)) break;
+		addTimeoutIfNeeded(state, ctx);
     }
 
 	private void addPacketToCollections(PacketInfo packet,OrderProcessingState state) {
@@ -112,6 +118,8 @@ public class OrderPackets extends KeyedProcessFunction<String, PacketInfo, List<
 					state.getPacketArrival().remove(packet);
 				}
 				out.collect(submittedList);
+				ctx.timerService().deleteProcessingTimeTimer(state.getTimerTimestamp());
+				state.setTimerTimestamp(null);
 				isSubmitted = Boolean.TRUE;
 			}
 		}
@@ -131,14 +139,14 @@ public class OrderPackets extends KeyedProcessFunction<String, PacketInfo, List<
 		OrderProcessingState state,
 		KeyedProcessFunction<String, PacketInfo, List<PacketInfo>>.Context ctx
 	) throws Exception {
-		if (state.getTimerStartOrder() >= state.getSubmittedOrder() + 1) return;
+		if (state.getPacketSet().size() == 0 || state.getTimerTimestamp() != null) return;
 
 		PacketInfo earliestPacket = state.getPacketArrival().first();
 		Long diff = Math.max((FLOW_TIMEOUT / 1000L) - earliestPacket.getArrivalTime(), 0);
 		long triggerTime = ctx.timerService().currentProcessingTime() + diff;
 
 		ctx.timerService().registerProcessingTimeTimer(triggerTime);
-		state.setTimerStartOrder(state.getSubmittedOrder() + 1);
+		state.setTimerTimestamp(triggerTime);
 	}
 
 	private Long getOrderOfEarliestFinPair(OrderProcessingState state) throws Exception {
