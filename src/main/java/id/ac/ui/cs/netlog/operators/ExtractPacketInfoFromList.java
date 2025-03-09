@@ -1,5 +1,8 @@
 package id.ac.ui.cs.netlog.operators;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.flink.api.common.functions.MapFunction;
 
 import id.ac.ui.cs.netlog.data.cicflowmeter.PacketInfo;
@@ -9,10 +12,14 @@ import id.ac.ui.cs.netlog.data.packets.TCP;
 import id.ac.ui.cs.netlog.data.packets.UDP;
 import id.ac.ui.cs.netlog.utils.PacketUtils;
 
-public class ExtractPacketInfo implements MapFunction<Packet, PacketInfo> {
+public class ExtractPacketInfoFromList implements MapFunction<List<Packet>, List<PacketInfo>> {
     @Override
-    public PacketInfo map(Packet packet) {
-        return this.getIpv4Info(packet);
+    public List<PacketInfo> map(List<Packet> packets) {
+        List<PacketInfo> infos = new ArrayList<>();
+        for (Packet packet: packets) {
+            infos.add(this.getIpv4Info(packet));
+        }
+        return infos;
     }
 
     private PacketInfo getIpv4Info(Packet packet){

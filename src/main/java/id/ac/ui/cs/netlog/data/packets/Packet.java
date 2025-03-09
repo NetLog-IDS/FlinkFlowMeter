@@ -11,6 +11,12 @@ public class Packet {
 
     @JsonProperty("timestamp")
     private Long timestamp;
+    
+    @JsonProperty("order")
+    private Long order;
+
+    @JsonProperty("publisherId")
+    private String publisherId;
 
     @JsonProperty("layers")
     private Layers layers;
