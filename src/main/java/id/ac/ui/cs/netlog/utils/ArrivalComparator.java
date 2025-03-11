@@ -11,8 +11,9 @@ public class ArrivalComparator implements Comparator<PacketInfo> {
             return 1;
         } else if (arg0.getArrivalTime() < arg1.getArrivalTime()) {
             return -1;
-        } else {
-            return 0;
         }
+
+        // Two elements cannot have same value in a set
+        return arg0.getPacketId().compareTo(arg1.getPacketId());
     }
 }

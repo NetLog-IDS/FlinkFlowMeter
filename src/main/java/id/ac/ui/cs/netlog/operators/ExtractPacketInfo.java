@@ -21,6 +21,7 @@ public class ExtractPacketInfo implements MapFunction<Packet, PacketInfo> {
             Layers packetLayer = packet.getLayers();
 			if (packetLayer.getNetwork() != null){
 				packetInfo = new PacketInfo();
+				packetInfo.setPacketId(packet.getId());
 				packetInfo.setSrc(PacketUtils.ipToByteArray(packetLayer.getNetwork().getSrc()));
 				packetInfo.setDst(PacketUtils.ipToByteArray(packetLayer.getNetwork().getDst()));
 				packetInfo.setOrder(packet.getOrder());

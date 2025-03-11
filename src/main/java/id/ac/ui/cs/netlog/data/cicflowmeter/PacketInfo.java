@@ -7,6 +7,7 @@ import lombok.Data;
 
 @Data
 public class PacketInfo {
+	private String packetId;
 	private long order;
 	private long arrivalTime;
 	private String publisherId;
@@ -52,8 +53,9 @@ public class PacketInfo {
 		return packet;
 	}
 
-	public static PacketInfo getTimestampComparator(Long timestamp) {
+	public static PacketInfo getTimestampComparatorUpperBound(Long timestamp) {
 		PacketInfo packet = new PacketInfo();
+		packet.setPacketId("~~~~~~~~-~~~~-~~~~-~~~~-~~~~~~~~~~~~");
 		packet.setTimeStamp(timestamp);
 		return packet;
 	}

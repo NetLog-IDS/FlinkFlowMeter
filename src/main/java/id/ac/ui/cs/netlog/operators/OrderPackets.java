@@ -86,8 +86,8 @@ public class OrderPackets extends KeyedProcessFunction<String, PacketInfo, List<
 		} else {
 			// TODO: choose whether to discard or just submit -> we need to support UDP
 			PacketInfo firstPacket = state.getPacketTimestamp().first();
-			PacketInfo comparator = PacketInfo.getTimestampComparator(firstPacket.getTimeStamp() + FLOW_TIMEOUT);
-			NavigableSet<PacketInfo> submittingPackets = state.getPacketTimestamp().headSet(comparator, true);
+			PacketInfo comparator = PacketInfo.getTimestampComparatorUpperBound(firstPacket.getTimeStamp() + FLOW_TIMEOUT);
+			NavigableSet<PacketInfo> submittingPackets = state.getPacketTimestamp().headSet(comparator, false);
 			PacketInfo lastPacket = submittingPackets.last();
 
 			state.setSubmittedOrder(lastPacket.getOrder());
