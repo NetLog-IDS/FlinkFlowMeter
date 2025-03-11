@@ -1,5 +1,7 @@
 package id.ac.ui.cs.netlog;
 
+import java.util.List;
+
 import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.connector.base.DeliveryGuarantee;
 import org.apache.flink.connector.kafka.sink.KafkaSink;
@@ -10,9 +12,12 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import id.ac.ui.cs.netlog.data.cicflowmeter.FlowStats;
+import id.ac.ui.cs.netlog.data.cicflowmeter.PacketInfo;
 import id.ac.ui.cs.netlog.operators.ExtractFlowStats;
 import id.ac.ui.cs.netlog.operators.ExtractPacketInfo;
 import id.ac.ui.cs.netlog.operators.FlowGenerator;
+import id.ac.ui.cs.netlog.operators.OrderPackets;
+import id.ac.ui.cs.netlog.operators.OrderPacketsDebugger;
 import id.ac.ui.cs.netlog.serialization.serializers.ObjectSerializer;
 import id.ac.ui.cs.netlog.source.StreamSource;
 import id.ac.ui.cs.netlog.source.enums.StreamSourceEnum;
@@ -36,21 +41,33 @@ public class StreamingJob {
 		StreamSourceFactory factory = new StreamSourceFactory(objectMapper);
 		StreamSource source = factory.getStreamSource(StreamSourceEnum.fromString(sourceString), env, parameters);
 
-        DataStream<FlowStats> stream = source.getSourceStream()
+        // DataStream<FlowStats> stream = source.getSourceStream()
+		// 		.map(new ExtractPacketInfo())
+		// 		.keyBy(packetInfo -> {
+		// 			String id = packetInfo.getFlowBidirectionalId();
+		// 			System.out.println(id);
+		// 			return id;
+		// 		})
+		// 		.process(new FlowGenerator(true))
+		// 		.map(new ExtractFlowStats());
+
+		DataStream<List<PacketInfo>> stream = source.getSourceStream()
 				.map(new ExtractPacketInfo())
 				.keyBy(packetInfo -> {
-					String id = packetInfo.getFlowBidirectionalId();
+					String id = packetInfo.getPublisherId() + "-" + packetInfo.getFlowBidirectionalId();
 					System.out.println(id);
 					return id;
 				})
-				.process(new FlowGenerator(true))
-				.map(new ExtractFlowStats());
+				.process(new OrderPackets())
+				.flatMap(new OrderPacketsDebugger());
 		
-		if (parameters.get(SINK_TYPE, "print").equals("kafka")) {
-			kafkaSink(parameters, stream, objectMapper);
-		} else {
-			printSink(stream);
-		}
+		stream.print();
+
+		// if (parameters.get(SINK_TYPE, "print").equals("kafka")) {
+		// 	kafkaSink(parameters, stream, objectMapper);
+		// } else {
+		// 	printSink(stream);
+		// }
 
 		env.execute("FlinkFlowMeter");
     }

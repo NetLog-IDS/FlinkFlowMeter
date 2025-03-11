@@ -9,8 +9,8 @@ import lombok.Data;
 public class PacketInfo {
 	private long order;
 	private long arrivalTime;
-	
 	private String publisherId;
+
     private byte[] src;
     private byte[] dst;
     private int srcPort;
@@ -49,6 +49,12 @@ public class PacketInfo {
 	public static PacketInfo getOrderComparator(Long order) {
 		PacketInfo packet = new PacketInfo();
 		packet.setOrder(order);
+		return packet;
+	}
+
+	public static PacketInfo getTimestampComparator(Long timestamp) {
+		PacketInfo packet = new PacketInfo();
+		packet.setTimeStamp(timestamp);
 		return packet;
 	}
 
