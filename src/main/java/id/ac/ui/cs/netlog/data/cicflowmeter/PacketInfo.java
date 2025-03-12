@@ -60,6 +60,13 @@ public class PacketInfo {
 		return packet;
 	}
 
+	public static PacketInfo getArrivalComparatorUpperBound(Long timestamp) {
+		PacketInfo packet = new PacketInfo();
+		packet.setPacketId("~~~~~~~~-~~~~-~~~~-~~~~-~~~~~~~~~~~~");
+		packet.setArrivalTime(timestamp);
+		return packet;
+	}
+
 	public String generateFlowId(){
     	boolean forward = true;
     	

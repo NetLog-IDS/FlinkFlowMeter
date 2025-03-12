@@ -156,8 +156,10 @@ public class OrderPackets extends KeyedProcessFunction<String, PacketInfo, List<
 					state.getPacketTimestamp().remove(packet);
 				}
 				out.collect(submittedList);
-				ctx.timerService().deleteProcessingTimeTimer(state.getTimerTimestamp());
-				state.setTimerTimestamp(null);
+				if (state.getTimerTimestamp() != null) {
+					ctx.timerService().deleteProcessingTimeTimer(state.getTimerTimestamp());
+					state.setTimerTimestamp(null);
+				}
 				isSubmitted = Boolean.TRUE;
 			}
 		}
