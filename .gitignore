@@ -1,2 +1,4 @@
 target/
 .vscode/
+releases/
+test-cases.txt

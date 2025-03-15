@@ -20,4 +20,17 @@ public class PacketUtils {
         }
         return ip.toString();
     }
+
+    public static Boolean ipLesserThan(byte[] ip1, byte[] ip2) {
+        Boolean isLess = true;
+        for(int i=0; i<ip1.length;i++){
+    		if(((Byte)(ip1[i])).intValue() != ((Byte)(ip2[i])).intValue()){
+    			if(((Byte)(ip1[i])).intValue() > ((Byte)(ip2[i])).intValue()){
+    				isLess = false;
+    			}
+    			break;
+    		}
+    	}
+        return isLess;
+    }
 }

@@ -27,9 +27,6 @@ public class KafkaStreamSource implements StreamSource {
         this.servers = parameters.get(KAFKA_SERVERS, "localhost:9200");
         this.topic = parameters.get(KAFKA_TOPIC, "network-traffic");
 		this.groupId = parameters.get(GROUP_ID, "flink-1");
-		System.out.println(this.servers);
-		System.out.println(this.topic);
-		System.out.println(this.groupId);
 		this.env = env;
 		this.objectMapper = objectMapper;
     }

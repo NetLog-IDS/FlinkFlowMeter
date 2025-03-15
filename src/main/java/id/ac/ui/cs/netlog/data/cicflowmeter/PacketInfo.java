@@ -7,6 +7,11 @@ import lombok.Data;
 
 @Data
 public class PacketInfo {
+	private String packetId;
+	private long order;
+	private long arrivalTime;
+	private String publisherId;
+
     private byte[] src;
     private byte[] dst;
     private int srcPort;
@@ -42,17 +47,37 @@ public class PacketInfo {
 		// TODO: Check if generateFlowId needs to be done
 	}
 
+	public static PacketInfo getOrderComparator(Long order) {
+		PacketInfo packet = new PacketInfo();
+		packet.setOrder(order);
+		return packet;
+	}
+
+	public static PacketInfo getTimestampComparatorUpperBound(Long timestamp) {
+		PacketInfo packet = new PacketInfo();
+		packet.setPacketId("~~~~~~~~-~~~~-~~~~-~~~~-~~~~~~~~~~~~");
+		packet.setTimeStamp(timestamp);
+		return packet;
+	}
+
+	public static PacketInfo getArrivalComparatorUpperBound(Long timestamp) {
+		PacketInfo packet = new PacketInfo();
+		packet.setPacketId("~~~~~~~~-~~~~-~~~~-~~~~-~~~~~~~~~~~~");
+		packet.setArrivalTime(timestamp);
+		return packet;
+	}
+
 	public String generateFlowId(){
     	boolean forward = true;
     	
     	for(int i=0; i<this.src.length;i++){           
     		if(((Byte)(this.src[i])).intValue() != ((Byte)(this.dst[i])).intValue()){
-    			if(((Byte)(this.src[i])).intValue() >((Byte)(this.dst[i])).intValue()){
+    			if(((Byte)(this.src[i])).intValue() > ((Byte)(this.dst[i])).intValue()){
     				forward = false;
     			}
     			i=this.src.length;
     		}
-    	}     	
+    	}
     	
         if(forward){
             this.flowId = this.getSourceIP() + "-" + this.getDestinationIP() + "-" + this.srcPort  + "-" + this.dstPort  + "-" + this.protocol;
