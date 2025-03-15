@@ -14,9 +14,6 @@ public class UDP extends Transport {
     @JsonProperty("dst_port")
     private Integer dstPort;
 
-    @JsonProperty("checksum")
-    private Long checksum;
-
     @JsonProperty("payload_length")
     private Long payloadLength;
 

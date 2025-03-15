@@ -14,23 +14,11 @@ public class TCP extends Transport {
     @JsonProperty("dst_port")
     private Integer dstPort;
 
-    @JsonProperty("seq")
-    private Long seq;
-
-    @JsonProperty("ack")
-    private Long ack;
-
-    @JsonProperty("dataofs")
-    private Long dataOfs;
-
     @JsonProperty("flags")
     private Integer flags;
 
     @JsonProperty("window")
     private Integer window;
-
-    @JsonProperty("checksum")
-    private Long checksum;
 
     @JsonProperty("payload_length")
     private Long payloadLength;
