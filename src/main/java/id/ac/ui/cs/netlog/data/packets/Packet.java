@@ -15,7 +15,7 @@ public class Packet {
     @JsonProperty("order")
     private Long order;
 
-    @JsonProperty("publisherId")
+    @JsonProperty("publisher_id")
     private String publisherId;
 
     @JsonProperty("layers")
