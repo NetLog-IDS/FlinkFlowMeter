@@ -16,5 +16,6 @@ public class OrderPacketsDebugger implements FlatMapFunction<List<PacketInfo>, L
             System.out.print(", ");
         }
         System.out.println();
+        out.collect(packets);
     }
 }
