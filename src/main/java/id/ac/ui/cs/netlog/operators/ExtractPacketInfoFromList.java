@@ -6,6 +6,7 @@ import java.util.List;
 import org.apache.flink.api.common.functions.MapFunction;
 
 import id.ac.ui.cs.netlog.data.cicflowmeter.PacketInfo;
+import id.ac.ui.cs.netlog.data.cicflowmeter.ProtocolEnum;
 import id.ac.ui.cs.netlog.data.packets.Layers;
 import id.ac.ui.cs.netlog.data.packets.Packet;
 import id.ac.ui.cs.netlog.data.packets.TCP;
@@ -34,12 +35,12 @@ public class ExtractPacketInfoFromList implements MapFunction<List<Packet>, List
 				packetInfo.setPublisherId(packet.getPublisherId());
 				packetInfo.setTimeStamp(packet.getTimestamp());
 
-				if(packetLayer.getTransport() instanceof TCP){
+				if (packetLayer.getTransport() instanceof TCP) {
                     TCP tcp = (TCP) packetLayer.getTransport();
 					packetInfo.setTCPWindow(tcp.getWindow());
 					packetInfo.setSrcPort(tcp.getSrcPort());
 					packetInfo.setDstPort(tcp.getDstPort());
-					packetInfo.setProtocol(6);
+					packetInfo.setProtocol(ProtocolEnum.TCP);
 					packetInfo.setFlagFIN((tcp.getFlags() & 1) != 0);
                     packetInfo.setFlagSYN((tcp.getFlags() & 2) != 0);
                     packetInfo.setFlagRST((tcp.getFlags() & 4) != 0);
@@ -50,13 +51,13 @@ public class ExtractPacketInfoFromList implements MapFunction<List<Packet>, List
 					packetInfo.setFlagCWR((tcp.getFlags() & 128) != 0);
 					packetInfo.setPayloadBytes(tcp.getPayloadLength());
 					packetInfo.setHeaderBytes(tcp.getHeaderLength());
-				} else if(packetLayer.getTransport() instanceof UDP){
+				} else if (packetLayer.getTransport() instanceof UDP) {
                     UDP udp = (UDP) packetLayer.getTransport();
 					packetInfo.setSrcPort(udp.getSrcPort());
 					packetInfo.setDstPort(udp.getDstPort());
-                    packetInfo.setProtocol(17);
 					packetInfo.setPayloadBytes(udp.getPayloadLength());
 					packetInfo.setHeaderBytes(udp.getHeaderLength());
+					packetInfo.setProtocol(ProtocolEnum.UDP);
 				}
 			}
 		} catch (Exception e) {

@@ -40,7 +40,7 @@ public class OrderPackets extends KeyedProcessFunction<String, PacketInfo, List<
     @Override
     public void processElement(PacketInfo packet, KeyedProcessFunction<String, PacketInfo, List<PacketInfo>>.Context ctx,
             Collector<List<PacketInfo>> out) throws Exception {
-		System.out.println("[PROCESSING_PACKET] " + packet.getFlowId() + " " + packet.getOrder());
+		// System.out.println("[PROCESSING_PACKET] " + packet.getFlowId() + " " + packet.getOrder());
 
 		initializeDefaultValue();
 
@@ -48,7 +48,7 @@ public class OrderPackets extends KeyedProcessFunction<String, PacketInfo, List<
 
 		Long submittedOrder = state.getSubmittedOrder();
 		if (packet.getOrder() <= submittedOrder) {
-			System.out.println("[PACKET_IGNORED] Because order is less than submitted order");
+			// System.out.println("[PACKET_IGNORED] Because order is less than submitted order");
 			return;
 		}
 
@@ -61,7 +61,7 @@ public class OrderPackets extends KeyedProcessFunction<String, PacketInfo, List<
 
 	@Override
     public void onTimer(long timestamp, OnTimerContext ctx, Collector<List<PacketInfo>> out) throws Exception {
-		System.out.println("[STARTING TIMER JOB...]");
+		// System.out.println("[STARTING TIMER JOB...]");
 
 		OrderProcessingState state = processingState.value();
 		state.setTimerTimestamp(null);

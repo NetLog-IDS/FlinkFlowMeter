@@ -20,17 +20,17 @@ public class TCP extends Transport {
     @JsonProperty("ack")
     private Long ack;
 
-    @JsonProperty("dataofs")
-    private Long dataOfs;
+    // @JsonProperty("dataofs")
+    // private Long dataOfs;
 
     @JsonProperty("flags")
     private Integer flags;
 
     @JsonProperty("window")
-    private Integer window;
+    private Integer window = 0;
 
-    @JsonProperty("checksum")
-    private Long checksum;
+    // @JsonProperty("checksum")
+    // private Long checksum;
 
     @JsonProperty("payload_length")
     private Long payloadLength;

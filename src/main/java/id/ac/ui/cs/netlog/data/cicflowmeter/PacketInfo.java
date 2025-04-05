@@ -16,7 +16,7 @@ public class PacketInfo {
     private byte[] dst;
     private int srcPort;
     private int dstPort;
-    private int protocol;
+    private ProtocolEnum protocol = ProtocolEnum.DEFAULT;
     private long timeStamp;
     private long payloadBytes;
     private String flowId = null;  
@@ -31,9 +31,13 @@ public class PacketInfo {
 	private	int TCPWindow=0;
 	private	long headerBytes;
 	private int payloadPacket=0;
+	private int icmpCode = -1;
+	private int icmpType = -1;
+
+	private TCPRetransmission tcpRetransmission;
 
 	public PacketInfo(byte[] src, byte[] dst, int srcPort, int dstPort,
-			int protocol, long timeStamp) {
+			ProtocolEnum protocol, long timeStamp) {
 		this.src = src;
 		this.dst = dst;
 		this.srcPort = srcPort;
@@ -80,19 +84,19 @@ public class PacketInfo {
     	}
     	
         if(forward){
-            this.flowId = this.getSourceIP() + "-" + this.getDestinationIP() + "-" + this.srcPort  + "-" + this.dstPort  + "-" + this.protocol;
+            this.flowId = this.getSourceIP() + "-" + this.getDestinationIP() + "-" + this.srcPort  + "-" + this.dstPort  + "-" + this.protocol.val;
         }else{
-            this.flowId = this.getDestinationIP() + "-" + this.getSourceIP() + "-" + this.dstPort  + "-" + this.srcPort  + "-" + this.protocol;
+            this.flowId = this.getDestinationIP() + "-" + this.getSourceIP() + "-" + this.dstPort  + "-" + this.srcPort  + "-" + this.protocol.val;
         }
         return this.flowId;
 	}
 
 	private String getNormalId() {
-		return this.getSourceIP() + "-" + this.getDestinationIP() + "-" + this.srcPort  + "-" + this.dstPort  + "-" + this.protocol;
+		return this.getSourceIP() + "-" + this.getDestinationIP() + "-" + this.srcPort  + "-" + this.dstPort  + "-" + this.protocol.val;
 	}
 
 	private String getReverseId() {
-		return this.getDestinationIP() + "-" + this.getSourceIP() + "-" + this.dstPort  + "-" + this.srcPort  + "-" + this.protocol;
+		return this.getDestinationIP() + "-" + this.getSourceIP() + "-" + this.dstPort  + "-" + this.srcPort  + "-" + this.protocol.val;
 	}
 
 	public String getFlowBidirectionalId() {
@@ -111,17 +115,21 @@ public class PacketInfo {
 	}
 
  	public String fwdFlowId() {  
-		this.flowId = this.getSourceIP() + "-" + this.getDestinationIP() + "-" + this.srcPort  + "-" + this.dstPort  + "-" + this.protocol;
+		this.flowId = this.getSourceIP() + "-" + this.getDestinationIP() + "-" + this.srcPort  + "-" + this.dstPort  + "-" + this.protocol.val;
 		return this.flowId;
 	}
 	
 	public String bwdFlowId() {  
-		this.flowId = this.getDestinationIP() + "-" + this.getSourceIP() + "-" + this.dstPort  + "-" + this.srcPort  + "-" + this.protocol;
+		this.flowId = this.getDestinationIP() + "-" + this.getSourceIP() + "-" + this.dstPort  + "-" + this.srcPort  + "-" + this.protocol.val;
 		return this.flowId;
 	}
     
 	public String dumpInfo() {
 		return null;
+	}
+
+	public Integer getPayloadPacket() {
+		return payloadPacket += 1;
 	}
     
     public String getSourceIP(){
@@ -143,7 +151,7 @@ public class PacketInfo {
 	}
 
 	public String getFlowId() {
-		return this.flowId!=null?this.flowId:generateFlowId();
+		return this.flowId != null ? this.flowId : generateFlowId();
 	}
 
 	public boolean isForwardPacket(byte[] sourceIP) {

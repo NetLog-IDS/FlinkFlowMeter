@@ -1,6 +1,7 @@
 package id.ac.ui.cs.netlog.operators;
 
 import java.util.Arrays;
+import java.util.List;
 
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
@@ -12,6 +13,8 @@ import org.apache.flink.util.Collector;
 
 import id.ac.ui.cs.netlog.data.cicflowmeter.Flow;
 import id.ac.ui.cs.netlog.data.cicflowmeter.PacketInfo;
+import id.ac.ui.cs.netlog.data.cicflowmeter.ProtocolEnum;
+import id.ac.ui.cs.netlog.data.cicflowmeter.TCPFlowState;
 import id.ac.ui.cs.netlog.utils.TimeUtils;
 
 public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow> {
@@ -37,6 +40,7 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 
     private static final Long FLOW_TIMEOUT = 120000000L;
     private static final Long ACTIVITY_TIMEOUT = 5000000L;
+	private static final List<ProtocolEnum> TCP_UDP_LIST_FILTER = Arrays.asList(ProtocolEnum.TCP, ProtocolEnum.UDP);
 
 	private transient ValueState<Flow> flowState;    
 
@@ -55,170 +59,254 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 		flowState = getRuntimeContext().getState(descriptor);
 	}
 
-    @Override
+	@Override
     public void processElement(PacketInfo packet,
             KeyedProcessFunction<String, PacketInfo, Flow>.Context ctx, Collector<Flow> out)
             throws Exception {
         if (packet == null) return;
 
-		System.out.println("=== PACKET START FOR " + packet.getFlowBidirectionalId() + " ===");
+		// System.out.println("=== PACKET START FOR " + packet.getFlowBidirectionalId() + " ===");
 
 		Flow flow = flowState.value();
 		Long currentInstanceTimestamp = TimeUtils.getCurrentTimeMicro();
-		// System.out.println("CURRENT TIME: " + currentInstanceTimestamp.toString());
+		
     	if (flow != null) {
             Long currentTimestamp = packet.getTimeStamp();
 
-    		// Flow flow = currentFlows.get(id);
-    		if ((currentTimestamp - flow.getFlowStartTime()) > FLOW_TIMEOUT) {
-				System.out.println(packet.getFlowBidirectionalId() + " TIMEOUTS");
-                // Flow finished due flowtimeout: 
-                // 1.- we move the flow to finished flow list
-                // 2.- we eliminate the flow from the current flow list
-                // 3.- we create a new flow with the packet-in-process
+			// Flow finished due flowtimeout:
+            // 1.- we move the flow to finished flow list
+            // 2.- we eliminate the flow from the current flow list
+            // 3.- we create a new flow with the packet-in-process
+    		if ((currentTimestamp - flow.getFlowStartTime()) > FLOW_TIMEOUT
+					|| ((flow.getTcpFlowState() == TCPFlowState.READY_FOR_TERMINATION) && packet.isFlagSYN())) {
 
-    			if (flow.packetCount() > 1) out.collect(flow);
+				// set cumulative flow time if TCP packet
+                if (TCP_UDP_LIST_FILTER.contains(flow.getProtocol())) {
+                    long currDuration = flow.getCumulativeConnectionDuration();
+                    currDuration += flow.getFlowDuration();
+                    flow.setCumulativeConnectionDuration(currDuration);
+                }
 
-				flowState.update(new Flow(
-					currentInstanceTimestamp,
-					bidirectional,
-					packet,
-					flow.getSrc(),
-					flow.getDst(),
-					flow.getSrcPort(),
-					flow.getDstPort(),
-					ACTIVITY_TIMEOUT
-				));
-				System.out.println(packet.getFlowBidirectionalId()+ " TRIGGERING TIMER SERVICE");
-				long triggerTime = ctx.timerService().currentProcessingTime() + (FLOW_TIMEOUT / 1000L);
-				ctx.timerService().registerProcessingTimeTimer(triggerTime);
+				out.collect(flow);
+
+				// Create a new UDP flow if activity time difference between the current UDP
+                // packet, and the last
+                // packet in the previous flow is greater than the flow activity timeout. This
+                // is to soften the issue
+                // with hard separation UDP flows that are likely part of the same "dialogue",
+                // which can lead to single
+                // packet flows with the hard flow time out cutoff. The concept of a "dialogue"
+                // is not well-defined in
+                // UDP, like TCP, so we assume that if the activity time difference between the
+                // current packet and the
+                // last packet in the previous flow is greater than the flow activity timeout,
+                // then the current packet
+                // is part of a new "dialogue".
+                boolean createNewUdpFlow = (flow.getProtocol() == ProtocolEnum.UDP
+                        && currentTimestamp - flow.getLastSeen() > FLOW_TIMEOUT);
+
+                // If the original flow is set for termination, or the flow is not a tcp
+                // connection, create a new flow,
+                // and place it into the currentFlows list
+                // Having a SYN packet and no ACK packet means it's the first packet in a new
+                // flow
+                if ((flow.getTcpFlowState() == TCPFlowState.READY_FOR_TERMINATION && packet.isFlagSYN()) // tcp flow is
+                                                                                                          // ready for
+                                                                                                          // termination
+                        || createNewUdpFlow // udp packet is not part of current "dialogue"
+                        || !TCP_UDP_LIST_FILTER.contains(packet.getProtocol()) // other protocols
+                ) {
+                    if (packet.isFlagSYN() && packet.isFlagACK()) {
+                        // create new flow, switch direction - we assume the PCAP file had a mistake
+                        // where SYN-ACK arrived before SYN packet
+						flowState.update(new Flow(
+							currentInstanceTimestamp,
+							bidirectional,
+							packet,
+							flow.getDst(),
+							flow.getSrc(),
+							flow.getDstPort(),
+							flow.getSrcPort(),
+							ACTIVITY_TIMEOUT
+						));
+                    } else {
+                        // Packet only has SYN, no ACK
+						flowState.update(new Flow(
+							currentInstanceTimestamp,
+							bidirectional,
+							packet,
+							flow.getSrc(),
+							flow.getDst(),
+							flow.getSrcPort(),
+							flow.getDstPort(),
+							ACTIVITY_TIMEOUT
+						));
+                    }
+                } else {
+                    // Otherwise, the previous flow was likely terminated because of a timeout, and
+                    // the new flow has to
+                    // maintain the same source and destination information as the previous flow
+                    // (since they're part of the
+                    // same TCP connection or UDP "dialogue".
+                    Flow newFlow = new Flow(
+						currentInstanceTimestamp,
+						bidirectional, packet,
+						flow.getSrc(),
+						flow.getDst(),
+                        flow.getSrcPort(),
+                        flow.getDstPort(),
+						ACTIVITY_TIMEOUT,
+						flow.getTcpPacketsSeen()
+					);
+
+                    long currDuration = flow.getCumulativeConnectionDuration();
+                    // get the gap between the last flow and the start of this flow
+                    currDuration += (currentTimestamp - flow.getLastSeen());
+                    newFlow.setCumulativeConnectionDuration(currDuration);
+					flowState.update(newFlow);
+                }
+				triggerTimer(packet, ctx);
     		} else if (packet.isFlagFIN()) {
                 // Flow finished due FIN flag (tcp only):
                 // 1.- we add the packet-in-process to the flow (it is the last packet)
                 // 2.- we move the flow to finished flow list
                 // 3.- we eliminate the flow from the current flow list
-    			if (Arrays.equals(flow.getSrc(), packet.getSrc())) {
-                    // Forward Flow
 
-    				// How many forward FIN received?
-    				if (flow.setFwdFINFlags() == 1) {
-    		        	// Flow finished due FIN flag (tcp only)?:
-    		    		// 1.- we add the packet-in-process to the flow (it is the last packet)
-    		        	// 2.- we move the flow to finished flow list
-    		        	// 3.- we eliminate the flow from the current flow list       					
-    					if ((flow.getBwdFINFlags() + flow.getBwdFINFlags()) == 2) {
-							System.out.println(packet.getFlowBidirectionalId() + " FWD 2 TRUE");
-                            // Forward Flow Finished.
-    		    	    	flow.addPacket(packet);
-                            out.collect(flow);
-							flowState.update(null);
-    					} else {
-							System.out.println(packet.getFlowBidirectionalId() + " FWD 2 ELSE");
-    		    			flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
-    		    			flow.addPacket(packet);
-							flowState.update(flow);
-    					}
-    				} else {
-                        // Some Error
-						System.out.println(packet.getFlowBidirectionalId() + " FWD SOME ERROR");
+                flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
+                flow.addPacket(packet);
+
+                // First FIN packet
+                if (flow.getTcpFlowState() == null) {
+                    flow.setTcpFlowState(TCPFlowState.FIRST_FIN_FLAG_RECEIVED);
+                } else if (flow.getTcpFlowState() == TCPFlowState.FIRST_FIN_FLAG_RECEIVED) {
+                    // Second FIN packet
+                    if (flow.getFwdFINFlags() > 0 && flow.getBwdFINFlags() > 0) {
+                        flow.setTcpFlowState(TCPFlowState.SECOND_FIN_FLAG_RECEIVED);
                     }
-    			} else {
-                    // Backward Flow
+                }
 
-    				// How many backward FIN packets received?
-    				if (flow.setBwdFINFlags() == 1) {
-    		        	// Flow finished due FIN flag (tcp only)?:
-    		    		// 1.- we add the packet-in-process to the flow (it is the last packet)
-    		        	// 2.- we move the flow to finished flow list
-    		        	// 3.- we eliminate the flow from the current flow list       					
-    					if ((flow.getBwdFINFlags() + flow.getBwdFINFlags()) == 2) {
-							System.out.println(packet.getFlowBidirectionalId() + " BWD 2 TRUE");
-                            // Backward Flow Finished.
-    		    	    	flow.addPacket(packet);
-    		                out.collect(flow);
-							flowState.update(null);
-    					} else {
-							System.out.println(packet.getFlowBidirectionalId() + " BWD 2 ELSE");
-    		    			flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
-    		    			flow.addPacket(packet);
-							flowState.update(flow);
-    					}
-    				} else {
-    					// Some Error
-						System.out.println(packet.getFlowBidirectionalId() + " BWD SOME ERROR");
-    				}    				
-    			}               
-    		}else if(packet.isFlagRST()) {
-				System.out.println("RST");
-                // Flow finished due RST flag (tcp only):
-                // 1.- we add the packet-in-process to the flow (it is the last packet)
-                // 2.- we move the flow to finished flow list
-                // 3.- we eliminate the flow from the current flow list 
+				flowState.update(flow);         
+    		} else if (packet.isFlagRST()) {
+				flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
+                flow.addPacket(packet);
+                flow.setTcpFlowState(TCPFlowState.READY_FOR_TERMINATION);
+				// TODO: make it submit without waiting for next packets -> problem: between READY FOR TERMINATION and next SYN, there may be packets
+				// If you want to drop it (e.g. drop until SYN/Timeout), you need to regenerate the dataset too
+				// TODO: Oh! what if we just make the timer trigger time as min(flow timeout, current time - packet time)
+                flowState.update(flow);
+			} else if (packet.isFlagACK()) {
+				flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
+                flow.addPacket(packet);
 
-    			flow.addPacket(packet);
-                out.collect(flow);
-				flowState.update(null);
-    		}else{
-    			if (Arrays.equals(flow.getSrc(), packet.getSrc()) && (flow.getFwdFINFlags() == 0)) {
-					System.out.println(packet.getFlowBidirectionalId() + " FWD UWOO");
-                    // Forward Flow and fwdFIN = 0
-        			flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
-        			flow.addPacket(packet);
+                // Final ack packet for TCP flow termination
+                if (flow.getTcpFlowState() == TCPFlowState.SECOND_FIN_FLAG_RECEIVED) {
+                    flow.setTcpFlowState(TCPFlowState.READY_FOR_TERMINATION); // TODO: see above
+                }
+                flowState.update(flow);
+			} else if (flow.getProtocol() == ProtocolEnum.ICMP) {
+				// create a new flow if the icmp code and types are different
+				if (flow.getIcmpCode() != packet.getIcmpCode() && flow.getIcmpType() != packet.getIcmpType()) {
+					// finish existing flow
+					out.collect(flow);
+
+					// create new flow
+					flowState.update(new Flow(
+						currentInstanceTimestamp,
+						bidirectional,
+						packet,
+						packet.getSrc(),
+						packet.getDst(),
+						packet.getSrcPort(),
+						packet.getDstPort(),
+						ACTIVITY_TIMEOUT
+					));
+					triggerTimer(packet, ctx);
+				} else {
+					// normal behavior
+					flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
+					flow.addPacket(packet);
 					flowState.update(flow);
-    			} else if (flow.getBwdFINFlags() == 0) {
-					System.out.println(packet.getFlowBidirectionalId() + " BWD UWOO");
-    			    // Backward Flow and bwdFIN = 0
-        			flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
-        			flow.addPacket(packet);
-					flowState.update(flow);
-    			} else {
-        		    // FLOW already closed!!!
-					System.out.println(packet.getFlowBidirectionalId() + " CLOSEEE");
-    			}
+				}
+			} else { // default
+    			flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
+                flow.addPacket(packet);
+                flowState.update(flow);
     		}
     	} else {
-			System.out.println(packet.getFlowBidirectionalId() + " SIIEEEE");
-			// TODO: make fwd and bwd have same key
-			flowState.update(new Flow(
-				currentInstanceTimestamp,
-				bidirectional,
-				packet,
-				ACTIVITY_TIMEOUT
-			));
-			System.out.println(packet.getFlowBidirectionalId()+ " TRIGGERING TIMER SERVICE");
-			long triggerTime = ctx.timerService().currentProcessingTime() + (FLOW_TIMEOUT / 1000L);
-			ctx.timerService().registerProcessingTimeTimer(triggerTime);
+			if (packet.isFlagSYN() && packet.isFlagACK()) {
+				// Backward
+				// TODO: make sure kalo dst src kebalik bakal dianggap backward
+				flowState.update(new Flow(
+					currentInstanceTimestamp,
+					bidirectional,
+					packet,
+					packet.getDst(),
+					packet.getSrc(),
+					packet.getDstPort(),
+					packet.getSrcPort(),
+					ACTIVITY_TIMEOUT
+				));
+            } else {
+				// Forward
+				// TODO: make sure kalo dst src sesuai bakal dianggap forward
+				flowState.update(new Flow(
+					currentInstanceTimestamp,	
+					bidirectional,
+					packet,
+					ACTIVITY_TIMEOUT
+				));
+            }
+			triggerTimer(packet, ctx);
     	}
 
-		System.out.println("=== PACKET ENDED FOR " + packet.getFlowBidirectionalId() + " ===");
+		// System.out.println("=== PACKET ENDED FOR " + packet.getFlowBidirectionalId() + " ===");
     }
+
+	// TODO: maybe we should use system time instead for epoch
+	private void triggerTimer(PacketInfo packet, KeyedProcessFunction<String, PacketInfo, Flow>.Context ctx) {
+		// System.out.println(packet.getFlowBidirectionalId() + " TRIGGERING TIMER SERVICE");
+		long diffMilli = FLOW_TIMEOUT / 1000L;
+		long triggerTime = ctx.timerService().currentProcessingTime() + diffMilli;
+		// System.out.println("CURRENT FLINK TIME:");
+		// System.out.println(ctx.timerService().currentProcessingTime());
+		// System.out.println("CURRENT PACKET TIME:");
+		// System.out.println(packet.getTimeStamp());
+		ctx.timerService().registerProcessingTimeTimer(triggerTime);
+	}
 
 	// TODO: there's concern about unsynchronized time which makes timestamp - flow.getFlowStartTime() < 0
     @Override
     public void onTimer(long timestamp, OnTimerContext ctx, Collector<Flow> out) throws Exception {
-		// Long timestampMicro = timestamp * 1000L;
-
-		System.out.println("==TIME TRIGGER START");
+		// System.out.println("==TIME TRIGGER START");
 		Flow flow = flowState.value();
 		if (flow == null) return;
 
-		Long processStarTimeMilli = flow.getProcessStartTime() / 1000L;
+		Long startTimeMilli = flow.getFlowStartTime() / 1000L;
 
-		System.out.println(((Long) timestamp).toString() + " - " + processStarTimeMilli);
+		// System.out.println("FLINK TIME: " + timestamp);
+		// System.out.println("PACKET TIME: " + startTimeMilli);
 
 		// Flow finished due flowtimeout: 
 		// 1.- we move the flow to finished flow list
 		// 2.- we eliminate the flow from the current flow list
 		// 3.- we create a new flow with the packet-in-process
-		if ((timestamp - processStarTimeMilli) >= (FLOW_TIMEOUT / 1000L)) {
-			System.out.println(flow.packetCount());
-			if (flow.packetCount() > 1) {
-				System.out.println("COLLECTED");
-				out.collect(flow);
+		// TODO: if startTimeMilli = flow start time and not flink start time --> will always be true --> need to cancel last timer
+		if ((timestamp - startTimeMilli) >= (FLOW_TIMEOUT / 1000L)) { // TODO: sesuain whole block ini (isinya jg) sama yg fixed CIC
+			// set cumulative flow time if TCP packet
+			if (TCP_UDP_LIST_FILTER.contains(flow.getProtocol())) {
+				long currDuration = flow.getCumulativeConnectionDuration();
+				currDuration += flow.getFlowDuration();
+				flow.setCumulativeConnectionDuration(currDuration);
 			}
+			
+			// System.out.println(flow.packetCount());
+			// if (flow.packetCount() > 1) {
+			// System.out.println("COLLECTED");
+			out.collect(flow);
+			// }
 			flowState.update(null);
 		}
 
-		System.out.println("==TIME TRIGGER END");
+		// System.out.println("==TIME TRIGGER END");
     }
 }

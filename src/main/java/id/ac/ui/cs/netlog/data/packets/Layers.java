@@ -1,15 +1,15 @@
 package id.ac.ui.cs.netlog.data.packets;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+// import com.fasterxml.jackson.annotation.JsonProperty;
 
 import lombok.Data;
 
 @Data
 public class Layers {
-    private Frame frame;
+    // private Frame frame;
 
-    @JsonProperty("data_link")
-    private DataLink ethernet;
+    // @JsonProperty("data_link")
+    // private DataLink ethernet;
 
     private Network network;
 
