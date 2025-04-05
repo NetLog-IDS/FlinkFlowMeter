@@ -123,10 +123,10 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 							currentInstanceTimestamp,
 							bidirectional,
 							packet,
-							flow.getDst(),
-							flow.getSrc(),
-							flow.getDstPort(),
-							flow.getSrcPort(),
+							packet.getDst(),
+							packet.getSrc(),
+							packet.getDstPort(),
+							packet.getSrcPort(),
 							ACTIVITY_TIMEOUT
 						));
                     } else {
@@ -135,10 +135,10 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 							currentInstanceTimestamp,
 							bidirectional,
 							packet,
-							flow.getSrc(),
-							flow.getDst(),
-							flow.getSrcPort(),
-							flow.getDstPort(),
+							packet.getSrc(),
+							packet.getDst(),
+							packet.getSrcPort(),
+							packet.getDstPort(),
 							ACTIVITY_TIMEOUT
 						));
                     }

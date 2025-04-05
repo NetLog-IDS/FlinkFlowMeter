@@ -143,12 +143,13 @@ public class FlowStats {
         // TODO: check yang Max Min apa boleh double atau malah jgn
 
         // Basic flow identifiers
-        this.fid = flow.getFlowId();
+        // this.fid = flow.getFlowId();
         this.srcIp = PacketUtils.byteArrayToIp(flow.getSrc());
         this.srcPort = flow.getSrcPort();
         this.dstIp = PacketUtils.byteArrayToIp(flow.getDst());
         this.dstPort = flow.getDstPort();
         this.protocol = flow.getProtocol().val;
+        this.fid = this.srcIp + "-" + this.dstIp + "-" + this.srcPort + "-" + this.dstPort + "-" + this.protocol;
         
         // Timestamp
         this.timestamp = DateUtils.convertEpochTimestamp2String(flow.getFlowStartTime());
