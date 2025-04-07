@@ -12,16 +12,16 @@ import id.ac.ui.cs.netlog.data.packets.UDP;
 import id.ac.ui.cs.netlog.utils.PacketUtils;
 
 public class ExtractPacketInfo implements MapFunction<Packet, PacketInfo> {
-    @Override
-    public PacketInfo map(Packet packet) {
-        return this.getIpv4Info(packet);
-    }
+	@Override
+	public PacketInfo map(Packet packet) {
+		return this.getIpv4Info(packet);
+	}
 
-    private PacketInfo getIpv4Info(Packet packet){
-		PacketInfo packetInfo = null;		
+	private PacketInfo getIpv4Info(Packet packet) {
+		PacketInfo packetInfo = null;
 		try {
-            Layers packetLayer = packet.getLayers();
-			if (packetLayer.getNetwork() != null){
+			Layers packetLayer = packet.getLayers();
+			if (packetLayer.getNetwork() != null) {
 				packetInfo = new PacketInfo();
 				packetInfo.setPacketId(packet.getId());
 				byte[] src = PacketUtils.ipToByteArray(packetLayer.getNetwork().getSrc());
@@ -40,10 +40,10 @@ public class ExtractPacketInfo implements MapFunction<Packet, PacketInfo> {
 					packetInfo.setDstPort(tcp.getDstPort());
 					packetInfo.setProtocol(ProtocolEnum.TCP);
 					packetInfo.setFlagFIN((tcp.getFlags() & 1) != 0);
-                    packetInfo.setFlagSYN((tcp.getFlags() & 2) != 0);
-                    packetInfo.setFlagRST((tcp.getFlags() & 4) != 0);
+					packetInfo.setFlagSYN((tcp.getFlags() & 2) != 0);
+					packetInfo.setFlagRST((tcp.getFlags() & 4) != 0);
 					packetInfo.setFlagPSH((tcp.getFlags() & 8) != 0);
-                    packetInfo.setFlagACK((tcp.getFlags() & 16) != 0);
+					packetInfo.setFlagACK((tcp.getFlags() & 16) != 0);
 					packetInfo.setFlagURG((tcp.getFlags() & 32) != 0);
 					packetInfo.setFlagECE((tcp.getFlags() & 64) != 0);
 					packetInfo.setFlagCWR((tcp.getFlags() & 128) != 0);

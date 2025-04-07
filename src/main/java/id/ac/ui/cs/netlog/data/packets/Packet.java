@@ -11,7 +11,7 @@ public class Packet {
 
     @JsonProperty("timestamp")
     private Long timestamp;
-    
+
     @JsonProperty("order")
     private Long order;
 
