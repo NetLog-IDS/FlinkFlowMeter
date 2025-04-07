@@ -15,7 +15,8 @@ public class FlowStats {
     private int dstPort;           // Destination Port
     private int protocol;          // Protocol
     private String timestamp;       // Timestamp
-    
+    private String sniffStartTime; // Sniff Start Time
+
     // Basic Flow Statistics
     private double flowDuration;    // Flow Duration
     private long totalFwdPackets;   // Total Forward Packets
@@ -136,14 +137,8 @@ public class FlowStats {
     // Cummulative
     private long cummConnectionTime;
     
-    // Classification
-    private String label;               // Traffic Classification Label
-
     public FlowStats(Flow flow) {
-        // TODO: check yang Max Min apa boleh double atau malah jgn
-
         // Basic flow identifiers
-        // this.fid = flow.getFlowId();
         this.srcIp = PacketUtils.byteArrayToIp(flow.getSrc());
         this.srcPort = flow.getSrcPort();
         this.dstIp = PacketUtils.byteArrayToIp(flow.getDst());
@@ -153,6 +148,7 @@ public class FlowStats {
         
         // Timestamp
         this.timestamp = DateUtils.convertEpochTimestamp2String(flow.getFlowStartTime());
+        this.sniffStartTime = DateUtils.convertEpochTimestamp2String(flow.getSniffStartTime());
         
         // Flow duration
         this.flowDuration = flow.getFlowLastSeen() - flow.getFlowStartTime();
@@ -299,8 +295,5 @@ public class FlowStats {
         this.totalTCPRetransCount = this.fwdTCPRetransCount + this.bwdTCPRetransCount;
 
         this.cummConnectionTime = flow.getCumulativeConnectionDuration();
-        
-        // Label
-        this.label = flow.getLabel();
     }
 }

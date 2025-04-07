@@ -10,6 +10,7 @@ public class PacketInfo {
 	private String packetId;
 	private long order;
 	private long arrivalTime;
+	private long sniffTime;
 	private String publisherId;
 
     private byte[] src;

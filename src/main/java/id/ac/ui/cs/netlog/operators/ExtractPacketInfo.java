@@ -31,15 +31,10 @@ public class ExtractPacketInfo implements MapFunction<Packet, PacketInfo> {
 				packetInfo.setOrder(packet.getOrder());
 				packetInfo.setPublisherId(packet.getPublisherId());
 				packetInfo.setTimeStamp(packet.getTimestamp());
-
-				// TODO: Remove ICMP
+				packetInfo.setSniffTime(packet.getSniffTime());
 
 				if (packetLayer.getTransport() instanceof TCP) {
                     TCP tcp = (TCP) packetLayer.getTransport();
-					// System.out.println("UWOO");
-					// System.out.println(tcp);
-					// System.out.println(tcp.getWindow());
-					// System.out.println("HEMM");
 					packetInfo.setTCPWindow(tcp.getWindow());
 					packetInfo.setSrcPort(tcp.getSrcPort());
 					packetInfo.setDstPort(tcp.getDstPort());

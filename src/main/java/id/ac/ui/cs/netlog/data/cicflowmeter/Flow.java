@@ -19,6 +19,7 @@ public class Flow {
     private final static String separator = ",";
 
 	private long processStartTime;
+    private long sniffStartTime;
 
 	private SummaryStatistics fwdPktStats = null;
 	private	SummaryStatistics bwdPktStats = null;
@@ -219,6 +220,7 @@ public class Flow {
 
 		this.endActiveTime = packet.getTimeStamp();
 		this.flowStartTime = packet.getTimeStamp();
+        this.sniffStartTime = packet.getSniffTime();
 		this.flowLastSeen = packet.getTimeStamp();
 		this.startActiveTime = packet.getTimeStamp();
 		detectUpdateSubflows(packet);
