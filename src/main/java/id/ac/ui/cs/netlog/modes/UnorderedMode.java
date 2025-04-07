@@ -17,7 +17,7 @@ public class UnorderedMode implements StreamMode {
 				.map(new ExtractPacketInfo())
 				.keyBy(packetInfo -> {
 					String id = packetInfo.getPublisherId() + "-" + packetInfo.getFlowBidirectionalId();
-					System.out.println(id);
+					// System.out.println(id);
 					return id;
 				})
 				.process(new OrderPackets())

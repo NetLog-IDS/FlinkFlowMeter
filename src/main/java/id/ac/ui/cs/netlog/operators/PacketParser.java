@@ -13,7 +13,7 @@ public class PacketParser implements MapFunction<String, Packet> {
 
     @Override
     public Packet map(String jsonString) {
-        System.out.println("Packet Received: " + jsonString);
+        // System.out.println("Packet Received: " + jsonString);
         try {
             return this.objectMapper.readValue(jsonString, Packet.class);
         } catch (Exception exc) {

@@ -9,7 +9,7 @@ public class ExtractFlowStats implements MapFunction<Flow, FlowStats> {
     @Override
     public FlowStats map(Flow flow) throws Exception {
         FlowStats stats = new FlowStats(flow);
-        System.out.println(stats);
+        // System.out.println(stats);
         return stats;
     }
 }

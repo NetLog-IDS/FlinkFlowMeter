@@ -20,4 +20,7 @@ public class Packet {
 
     @JsonProperty("layers")
     private Layers layers;
+
+    @JsonProperty("sniff_time")
+    private Long sniffTime;
 }

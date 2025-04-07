@@ -15,7 +15,7 @@ public class OrderedMode implements StreamMode {
 				.map(new ExtractPacketInfo())
 				.keyBy(packetInfo -> {
 					String id = packetInfo.getPublisherId() + "-" + packetInfo.getFlowBidirectionalId();
-					System.out.println(id);
+					// System.out.println("ACCESSED: " + id);
 					return id;
 				})
 				.process(new FlowGenerator(true))
