@@ -71,6 +71,7 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
             KeyedProcessFunction<String, PacketInfo, Flow>.Context ctx, Collector<Flow> out)
             throws Exception {
         if (packet == null) return;
+		if (!TCP_UDP_LIST_FILTER.contains(packet.getProtocol())) return;
 
 		Flow flow = flowState.value();
 		Long currentInstanceTimestamp = TimeUtils.getCurrentTimeMicro();
@@ -86,11 +87,9 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 					|| ((flow.getTcpFlowState() == TCPFlowState.READY_FOR_TERMINATION) && packet.isFlagSYN())) {
 
 				// set cumulative flow time if TCP packet
-                if (TCP_UDP_LIST_FILTER.contains(flow.getProtocol())) {
-                    long currDuration = flow.getCumulativeConnectionDuration();
-                    currDuration += flow.getFlowDuration();
-                    flow.setCumulativeConnectionDuration(currDuration);
-                }
+				long currDuration = flow.getCumulativeConnectionDuration();
+				currDuration += flow.getFlowDuration();
+				flow.setCumulativeConnectionDuration(currDuration);
 
 				out.collect(flow);
 
@@ -119,7 +118,6 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
                                                                                                           // ready for
                                                                                                           // termination
                         || createNewUdpFlow // udp packet is not part of current "dialogue"
-                        || !TCP_UDP_LIST_FILTER.contains(packet.getProtocol()) // other protocols
                 ) {
                     if (packet.isFlagSYN() && packet.isFlagACK()) {
                         // create new flow, switch direction - we assume the PCAP file had a mistake
@@ -164,7 +162,7 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 						flow.getTcpPacketsSeen()
 					);
 
-                    long currDuration = flow.getCumulativeConnectionDuration();
+                    currDuration = flow.getCumulativeConnectionDuration();
                     // get the gap between the last flow and the start of this flow
                     currDuration += (currentTimestamp - flow.getLastSeen());
                     newFlow.setCumulativeConnectionDuration(currDuration);
@@ -208,30 +206,6 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
                     flow.setTcpFlowState(TCPFlowState.READY_FOR_TERMINATION); // TODO: see above
                 }
                 flowState.update(flow);
-			} else if (flow.getProtocol() == ProtocolEnum.ICMP) {
-				// create a new flow if the icmp code and types are different
-				if (flow.getIcmpCode() != packet.getIcmpCode() && flow.getIcmpType() != packet.getIcmpType()) {
-					// finish existing flow
-					out.collect(flow);
-
-					// create new flow
-					flowState.update(new Flow(
-						currentInstanceTimestamp,
-						bidirectional,
-						packet,
-						packet.getSrc(),
-						packet.getDst(),
-						packet.getSrcPort(),
-						packet.getDstPort(),
-						ACTIVITY_TIMEOUT
-					));
-					triggerTimer(flow, ctx);
-				} else {
-					// normal behavior
-					flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
-					flow.addPacket(packet);
-					flowState.update(flow);
-				}
 			} else { // default
     			flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
                 flow.addPacket(packet);
@@ -240,7 +214,6 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
     	} else {
 			if (packet.isFlagSYN() && packet.isFlagACK()) {
 				// Backward
-				// TODO: make sure kalo dst src kebalik bakal dianggap backward
 				flowState.update(new Flow(
 					currentInstanceTimestamp,
 					bidirectional,
@@ -253,7 +226,6 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 				));
             } else {
 				// Forward
-				// TODO: make sure kalo dst src sesuai bakal dianggap forward
 				flowState.update(new Flow(
 					currentInstanceTimestamp,	
 					bidirectional,
@@ -294,11 +266,10 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 		// 1.- we move the flow to finished flow list
 		// 2.- we eliminate the flow from the current flow list
 		// 3.- we create a new flow with the packet-in-process
-		if (TCP_UDP_LIST_FILTER.contains(flow.getProtocol())) {
-			long currDuration = flow.getCumulativeConnectionDuration();
-			currDuration += flow.getFlowDuration();
-			flow.setCumulativeConnectionDuration(currDuration);
-		}
+		long currDuration = flow.getCumulativeConnectionDuration();
+		currDuration += flow.getFlowDuration();
+		flow.setCumulativeConnectionDuration(currDuration);
+
 		out.collect(flow);
 		flowState.update(null);
     }
