@@ -238,9 +238,15 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
     }
 
 	private void triggerTimer(Flow flow, KeyedProcessFunction<String, PacketInfo, Flow>.Context ctx) throws Exception {
+		TimerParams timerParams = timerState.value();
+		if (timerParams != null) {
+			ctx.timerService().deleteProcessingTimeTimer(timerParams.getTimestamp());
+		}
+
 		long delay = FLOW_TIMEOUT;
 		long triggerTime = ctx.timerService().currentProcessingTime() + (delay / 1000L);
-		ctx.timerService().registerEventTimeTimer(triggerTime);
+		ctx.timerService().registerProcessingTimeTimer(triggerTime);
+		
 		timerState.update(new TimerParams(triggerTime, flow.getFlowId()));
 	}
 
@@ -251,16 +257,14 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 
 		TimerParams params = timerState.value();
 		if (params == null) {
-			System.out.println("[UNEXPECTED BEHAVIOR] Not supposed to be here");
+			System.out.println("[UNEXPECTED BEHAVIOR] Params is null");
 			return;
 		}
-		Long lastTimestamp = params.getTimestamp();
-		String lastFlowId = params.getFlowId();
-
-		if (!lastTimestamp.equals(timestamp)) return;
+		if (!params.getFlowId().equals(flow.getFlowId())) {
+			System.out.println("[UNEXPECTED BEHAVIOR] Flow id is different");
+			return;
+		}
 		timerState.update(null);
-
-		if (!lastFlowId.equals(flow.getFlowId())) return;
 
 		// Flow finished due flowtimeout:
 		// 1.- we move the flow to finished flow list
