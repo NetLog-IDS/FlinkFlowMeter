@@ -15,6 +15,7 @@ import id.ac.ui.cs.netlog.data.cicflowmeter.Flow;
 import id.ac.ui.cs.netlog.data.cicflowmeter.PacketInfo;
 import id.ac.ui.cs.netlog.data.cicflowmeter.ProtocolEnum;
 import id.ac.ui.cs.netlog.data.cicflowmeter.TCPFlowState;
+import id.ac.ui.cs.netlog.data.cicflowmeter.TimerParams;
 import id.ac.ui.cs.netlog.utils.TimeUtils;
 
 public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow> {
@@ -42,7 +43,8 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
     private static final Long ACTIVITY_TIMEOUT = 5000000L;
 	private static final List<ProtocolEnum> TCP_UDP_LIST_FILTER = Arrays.asList(ProtocolEnum.TCP, ProtocolEnum.UDP);
 
-	private transient ValueState<Flow> flowState;    
+	private transient ValueState<Flow> flowState;
+	private transient ValueState<TimerParams> timerState;
 
 	private boolean bidirectional;
 	
@@ -52,11 +54,16 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 
 	@Override
 	public void open(Configuration parameters) {
-		ValueStateDescriptor<Flow> descriptor = new ValueStateDescriptor<>(
+		ValueStateDescriptor<Flow> flowDescriptor = new ValueStateDescriptor<>(
 			"flowState",
 			TypeInformation.of(new TypeHint<Flow>() {})
 		);
-		flowState = getRuntimeContext().getState(descriptor);
+		ValueStateDescriptor<TimerParams> timerDescriptor = new ValueStateDescriptor<>(
+			"timerState",
+			TypeInformation.of(new TypeHint<TimerParams>() {})
+		);
+		flowState = getRuntimeContext().getState(flowDescriptor);
+		timerState = getRuntimeContext().getState(timerDescriptor);
 	}
 
 	@Override
@@ -64,8 +71,6 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
             KeyedProcessFunction<String, PacketInfo, Flow>.Context ctx, Collector<Flow> out)
             throws Exception {
         if (packet == null) return;
-
-		// System.out.println("=== PACKET START FOR " + packet.getFlowBidirectionalId() + " ===");
 
 		Flow flow = flowState.value();
 		Long currentInstanceTimestamp = TimeUtils.getCurrentTimeMicro();
@@ -165,7 +170,7 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
                     newFlow.setCumulativeConnectionDuration(currDuration);
 					flowState.update(newFlow);
                 }
-				triggerTimer(packet, ctx);
+				triggerTimer(flow, ctx);
     		} else if (packet.isFlagFIN()) {
                 // Flow finished due FIN flag (tcp only):
                 // 1.- we add the packet-in-process to the flow (it is the last packet)
@@ -220,7 +225,7 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 						packet.getDstPort(),
 						ACTIVITY_TIMEOUT
 					));
-					triggerTimer(packet, ctx);
+					triggerTimer(flow, ctx);
 				} else {
 					// normal behavior
 					flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
@@ -256,57 +261,45 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 					ACTIVITY_TIMEOUT
 				));
             }
-			triggerTimer(packet, ctx);
+			triggerTimer(flow, ctx);
     	}
-
-		// System.out.println("=== PACKET ENDED FOR " + packet.getFlowBidirectionalId() + " ===");
     }
 
-	// TODO: maybe we should use system time instead for epoch
-	private void triggerTimer(PacketInfo packet, KeyedProcessFunction<String, PacketInfo, Flow>.Context ctx) {
-		// System.out.println(packet.getFlowBidirectionalId() + " TRIGGERING TIMER SERVICE");
-		long diffMilli = FLOW_TIMEOUT / 1000L;
-		long triggerTime = ctx.timerService().currentProcessingTime() + diffMilli;
-		// System.out.println("CURRENT FLINK TIME:");
-		// System.out.println(ctx.timerService().currentProcessingTime());
-		// System.out.println("CURRENT PACKET TIME:");
-		// System.out.println(packet.getTimeStamp());
-		ctx.timerService().registerProcessingTimeTimer(triggerTime);
+	private void triggerTimer(Flow flow, KeyedProcessFunction<String, PacketInfo, Flow>.Context ctx) throws Exception {
+		long delay = FLOW_TIMEOUT;
+		long triggerTime = ctx.timerService().currentProcessingTime() + (delay / 1000L);
+		ctx.timerService().registerEventTimeTimer(triggerTime);
+		timerState.update(new TimerParams(triggerTime, flow.getFlowId()));
 	}
 
-	// TODO: there's concern about unsynchronized time which makes timestamp - flow.getFlowStartTime() < 0
     @Override
     public void onTimer(long timestamp, OnTimerContext ctx, Collector<Flow> out) throws Exception {
-		// System.out.println("==TIME TRIGGER START");
 		Flow flow = flowState.value();
 		if (flow == null) return;
 
-		Long startTimeMilli = flow.getFlowStartTime() / 1000L;
+		TimerParams params = timerState.value();
+		if (params == null) {
+			System.out.println("[UNEXPECTED BEHAVIOR] Not supposed to be here");
+			return;
+		}
+		Long lastTimestamp = params.getTimestamp();
+		String lastFlowId = params.getFlowId();
 
-		// System.out.println("FLINK TIME: " + timestamp);
-		// System.out.println("PACKET TIME: " + startTimeMilli);
+		if (!lastTimestamp.equals(timestamp)) return;
+		timerState.update(null);
 
-		// Flow finished due flowtimeout: 
+		if (!lastFlowId.equals(flow.getFlowId())) return;
+
+		// Flow finished due flowtimeout:
 		// 1.- we move the flow to finished flow list
 		// 2.- we eliminate the flow from the current flow list
 		// 3.- we create a new flow with the packet-in-process
-		// TODO: if startTimeMilli = flow start time and not flink start time --> will always be true --> need to cancel last timer
-		if ((timestamp - startTimeMilli) >= (FLOW_TIMEOUT / 1000L)) { // TODO: sesuain whole block ini (isinya jg) sama yg fixed CIC
-			// set cumulative flow time if TCP packet
-			if (TCP_UDP_LIST_FILTER.contains(flow.getProtocol())) {
-				long currDuration = flow.getCumulativeConnectionDuration();
-				currDuration += flow.getFlowDuration();
-				flow.setCumulativeConnectionDuration(currDuration);
-			}
-			
-			// System.out.println(flow.packetCount());
-			// if (flow.packetCount() > 1) {
-			// System.out.println("COLLECTED");
-			out.collect(flow);
-			// }
-			flowState.update(null);
+		if (TCP_UDP_LIST_FILTER.contains(flow.getProtocol())) {
+			long currDuration = flow.getCumulativeConnectionDuration();
+			currDuration += flow.getFlowDuration();
+			flow.setCumulativeConnectionDuration(currDuration);
 		}
-
-		// System.out.println("==TIME TRIGGER END");
+		out.collect(flow);
+		flowState.update(null);
     }
 }
