@@ -1,7 +1,9 @@
 package id.ac.ui.cs.netlog.operators;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
@@ -15,6 +17,7 @@ import id.ac.ui.cs.netlog.data.cicflowmeter.Flow;
 import id.ac.ui.cs.netlog.data.cicflowmeter.PacketInfo;
 import id.ac.ui.cs.netlog.data.cicflowmeter.ProtocolEnum;
 import id.ac.ui.cs.netlog.data.cicflowmeter.TCPFlowState;
+import id.ac.ui.cs.netlog.data.cicflowmeter.TCPRetransmission;
 import id.ac.ui.cs.netlog.data.cicflowmeter.TimerParams;
 import id.ac.ui.cs.netlog.utils.TimeUtils;
 
@@ -87,11 +90,13 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 					|| ((flow.getTcpFlowState() == TCPFlowState.READY_FOR_TERMINATION) && packet.isFlagSYN())) {
 
 				// set cumulative flow time if TCP packet
-				long currDuration = flow.getCumulativeConnectionDuration();
-				currDuration += flow.getFlowDuration();
-				flow.setCumulativeConnectionDuration(currDuration);
+				// long currDuration = flow.getCumulativeConnectionDuration();
+				// currDuration += flow.getFlowDuration();
+				// flow.setCumulativeConnectionDuration(currDuration);
 
-				out.collect(flow);
+				if (flow.getTcpFlowState() != TCPFlowState.READY_FOR_TERMINATION) {
+					out.collect(flow);
+				}
 
 				// Create a new UDP flow if activity time difference between the current UDP
                 // packet, and the last
@@ -151,24 +156,29 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
                     // maintain the same source and destination information as the previous flow
                     // (since they're part of the
                     // same TCP connection or UDP "dialogue".
+					Set<TCPRetransmission> tcpPacketsSeenCopy = new HashSet<>(flow.getTcpPacketsSeen()); 
                     Flow newFlow = new Flow(
 						currentInstanceTimestamp,
-						bidirectional, packet,
+						bidirectional,
+						packet,
 						flow.getSrc(),
 						flow.getDst(),
                         flow.getSrcPort(),
                         flow.getDstPort(),
 						ACTIVITY_TIMEOUT,
-						flow.getTcpPacketsSeen()
+						tcpPacketsSeenCopy
 					);
 
-                    currDuration = flow.getCumulativeConnectionDuration();
+                    // currDuration = flow.getCumulativeConnectionDuration();
                     // get the gap between the last flow and the start of this flow
-                    currDuration += (currentTimestamp - flow.getLastSeen());
-                    newFlow.setCumulativeConnectionDuration(currDuration);
+                    // currDuration += (currentTimestamp - flow.getLastSeen());
+                    // newFlow.setCumulativeConnectionDuration(currDuration);
 					flowState.update(newFlow);
                 }
 				triggerTimer(flow, ctx);
+			} else if (flow.getTcpFlowState() == TCPFlowState.READY_FOR_TERMINATION) {
+				// Ignore packets after termination and before SYN
+				return;
     		} else if (packet.isFlagFIN()) {
                 // Flow finished due FIN flag (tcp only):
                 // 1.- we add the packet-in-process to the flow (it is the last packet)
@@ -192,10 +202,8 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
     		} else if (packet.isFlagRST()) {
 				flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
                 flow.addPacket(packet);
-                flow.setTcpFlowState(TCPFlowState.READY_FOR_TERMINATION);
-				// TODO: make it submit without waiting for next packets -> problem: between READY FOR TERMINATION and next SYN, there may be packets
-				// If you want to drop it (e.g. drop until SYN/Timeout), you need to regenerate the dataset too
-				// TODO: Oh! what if we just make the timer trigger time as min(flow timeout, current time - packet time)
+				flow.setTcpFlowState(TCPFlowState.READY_FOR_TERMINATION);
+				out.collect(flow);
                 flowState.update(flow);
 			} else if (packet.isFlagACK()) {
 				flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
@@ -203,7 +211,8 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 
                 // Final ack packet for TCP flow termination
                 if (flow.getTcpFlowState() == TCPFlowState.SECOND_FIN_FLAG_RECEIVED) {
-                    flow.setTcpFlowState(TCPFlowState.READY_FOR_TERMINATION); // TODO: see above
+                    flow.setTcpFlowState(TCPFlowState.READY_FOR_TERMINATION);
+					out.collect(flow);
                 }
                 flowState.update(flow);
 			} else { // default
@@ -270,11 +279,13 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 		// 1.- we move the flow to finished flow list
 		// 2.- we eliminate the flow from the current flow list
 		// 3.- we create a new flow with the packet-in-process
-		long currDuration = flow.getCumulativeConnectionDuration();
-		currDuration += flow.getFlowDuration();
-		flow.setCumulativeConnectionDuration(currDuration);
+		// long currDuration = flow.getCumulativeConnectionDuration();
+		// currDuration += flow.getFlowDuration();
+		// flow.setCumulativeConnectionDuration(currDuration);
 
-		out.collect(flow);
+		if (flow.getTcpFlowState() != TCPFlowState.READY_FOR_TERMINATION) {
+			out.collect(flow);
+		}
 		flowState.update(null);
     }
 }
