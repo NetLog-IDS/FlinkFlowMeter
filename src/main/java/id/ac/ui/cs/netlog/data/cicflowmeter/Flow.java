@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import org.apache.commons.math3.stat.descriptive.SummaryStatistics;
 
@@ -276,7 +277,7 @@ public class Flow {
 		this.protocol = packet.getProtocol();
         this.icmpCode = packet.getIcmpCode();
         this.icmpType = packet.getIcmpType();
-        this.flowId = packet.getFlowId();
+        this.flowId = UUID.randomUUID().toString();
         handleTcpRetransmissionFields(packet);	
 	}
 
@@ -323,15 +324,13 @@ public class Flow {
 				if(packet.getPayloadBytes() >= 1){
 					this.Act_data_pkt_forward++;
 				}
-				// System.out.println("Adding Fwd Packet for " + this.flowId + ". Current N" + ((Long) this.fwdPktStats.getN()).toString());
 				this.fwdPktStats.addValue((double) packet.getPayloadBytes());
-				// System.out.println("Result of adding Fwd Packet for " + this.flowId + ". Current N" + ((Long) this.fwdPktStats.getN()).toString());
 				this.fHeaderBytes += packet.getHeaderBytes();
     			this.forward.add(packet);   
     			this.forwardBytes += packet.getPayloadBytes();
     			if (this.forward.size() > 1)
     				this.forwardIAT.addValue(currentTimestamp - this.forwardLastSeen);
-    			this.forwardLastSeen = currentTimestamp;
+    			this.forwardLastSeen = Math.max(this.forwardLastSeen, currentTimestamp);
 				this.min_seg_size_forward = Math.min(packet.getHeaderBytes(), this.min_seg_size_forward);
                 if (packet.isFlagPSH()) {
                     this.fPSH_cnt++;
@@ -349,9 +348,7 @@ public class Flow {
 				if (packet.getPayloadBytes() >= 1) {
                     this.Act_data_pkt_backward++;
                 }
-				// System.out.println("Adding Bwd Packet for " + this.flowId + ". Current N" + ((Long) this.bwdPktStats.getN()).toString());
 				this.bwdPktStats.addValue((double) packet.getPayloadBytes());
-				// System.out.println("Result of adding Bwd Packet for " + this.flowId + ". Current N" + ((Long) this.bwdPktStats.getN()).toString());
 				// set Init_win_bytes_backward if not been set. The set logic isn't 100%
                 // accurate, since it technically takes the first non-zero value, but should
                 // be good enough for most cases.
@@ -363,7 +360,7 @@ public class Flow {
     			this.backwardBytes += packet.getPayloadBytes();
     			if (this.backward.size() > 1)
     				this.backwardIAT.addValue(currentTimestamp - this.backwardLastSeen);
-    			this.backwardLastSeen = currentTimestamp;
+    			this.backwardLastSeen = Math.max(backwardLastSeen, currentTimestamp);
 				this.min_seg_size_backward = Math.min(packet.getHeaderBytes(), this.min_seg_size_backward);
                 if (packet.isFlagPSH()) {
                     this.bPSH_cnt++;
@@ -388,12 +385,12 @@ public class Flow {
     		this.forward.add(packet);    		
     		this.forwardBytes += packet.getPayloadBytes();
     		this.forwardIAT.addValue(currentTimestamp - this.forwardLastSeen);
-    		this.forwardLastSeen = currentTimestamp;
+    		this.forwardLastSeen = Math.max(this.forwardLastSeen, currentTimestamp);
 			this.min_seg_size_forward = Math.min(packet.getHeaderBytes(), this.min_seg_size_forward);
     	}
 
     	this.flowIAT.addValue(packet.getTimeStamp() - this.flowLastSeen);
-    	this.flowLastSeen = packet.getTimeStamp();
+    	this.flowLastSeen = Math.max(this.flowLastSeen, packet.getTimeStamp());
     }
 
 	public double getfPktsPerSecond() {
