@@ -114,6 +114,7 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
                 // and place it into the currentFlows list
                 // Having a SYN packet and no ACK packet means it's the first packet in a new
                 // flow
+				Flow newFlow = null;
                 if ((flow.getTcpFlowState() == TCPFlowState.READY_FOR_TERMINATION && packet.isFlagSYN()) // tcp flow is
                                                                                                           // ready for
                                                                                                           // termination
@@ -122,7 +123,7 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
                     if (packet.isFlagSYN() && packet.isFlagACK()) {
                         // create new flow, switch direction - we assume the PCAP file had a mistake
                         // where SYN-ACK arrived before SYN packet
-						flowState.update(new Flow(
+						newFlow = new Flow(
 							currentInstanceTimestamp,
 							bidirectional,
 							packet,
@@ -131,10 +132,11 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 							packet.getDstPort(),
 							packet.getSrcPort(),
 							ACTIVITY_TIMEOUT
-						));
+						);
+						flowState.update(newFlow);
                     } else {
                         // Packet only has SYN, no ACK
-						flowState.update(new Flow(
+						newFlow = new Flow(
 							currentInstanceTimestamp,
 							bidirectional,
 							packet,
@@ -143,7 +145,8 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 							packet.getSrcPort(),
 							packet.getDstPort(),
 							ACTIVITY_TIMEOUT
-						));
+						);
+						flowState.update(newFlow);
                     }
                 } else {
                     // Otherwise, the previous flow was likely terminated because of a timeout, and
@@ -151,7 +154,7 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
                     // maintain the same source and destination information as the previous flow
                     // (since they're part of the
                     // same TCP connection or UDP "dialogue".
-                    Flow newFlow = new Flow(
+                    newFlow = new Flow(
 						currentInstanceTimestamp,
 						bidirectional, packet,
 						flow.getSrc(),
@@ -168,7 +171,7 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
                     newFlow.setCumulativeConnectionDuration(currDuration);
 					flowState.update(newFlow);
                 }
-				triggerTimer(flow, ctx);
+				triggerTimer(newFlow, ctx);
     		} else if (packet.isFlagFIN()) {
                 // Flow finished due FIN flag (tcp only):
                 // 1.- we add the packet-in-process to the flow (it is the last packet)
@@ -212,9 +215,10 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
                 flowState.update(flow);
     		}
     	} else {
+			Flow newFlow = null;
 			if (packet.isFlagSYN() && packet.isFlagACK()) {
 				// Backward
-				flowState.update(new Flow(
+				newFlow = new Flow(
 					currentInstanceTimestamp,
 					bidirectional,
 					packet,
@@ -223,23 +227,26 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 					packet.getDstPort(),
 					packet.getSrcPort(),
 					ACTIVITY_TIMEOUT
-				));
+				);
+				flowState.update(newFlow);
             } else {
 				// Forward
-				flowState.update(new Flow(
+				newFlow = new Flow(
 					currentInstanceTimestamp,	
 					bidirectional,
 					packet,
 					ACTIVITY_TIMEOUT
-				));
+				);
+				flowState.update(newFlow);
             }
-			triggerTimer(flow, ctx);
+			triggerTimer(newFlow, ctx);
     	}
     }
 
 	private void triggerTimer(Flow flow, KeyedProcessFunction<String, PacketInfo, Flow>.Context ctx) throws Exception {
 		TimerParams timerParams = timerState.value();
 		if (timerParams != null) {
+			System.out.println("[DEBUG TIMER PARAMS] " + timerParams.toString());
 			ctx.timerService().deleteProcessingTimeTimer(timerParams.getTimestamp());
 		}
 
@@ -247,6 +254,7 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 		long triggerTime = ctx.timerService().currentProcessingTime() + (delay / 1000L);
 		ctx.timerService().registerProcessingTimeTimer(triggerTime);
 		
+		System.out.println("[DEBUG TIMERSTATE] " + Boolean.toString(timerState == null));
 		timerState.update(new TimerParams(triggerTime, flow.getFlowId()));
 	}
 
