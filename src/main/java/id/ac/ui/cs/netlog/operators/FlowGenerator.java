@@ -119,6 +119,7 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
                 // and place it into the currentFlows list
                 // Having a SYN packet and no ACK packet means it's the first packet in a new
                 // flow
+				Flow newFlow = null;
                 if ((flow.getTcpFlowState() == TCPFlowState.READY_FOR_TERMINATION && packet.isFlagSYN()) // tcp flow is
                                                                                                           // ready for
                                                                                                           // termination
@@ -127,7 +128,7 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
                     if (packet.isFlagSYN() && packet.isFlagACK()) {
                         // create new flow, switch direction - we assume the PCAP file had a mistake
                         // where SYN-ACK arrived before SYN packet
-						flowState.update(new Flow(
+						newFlow = new Flow(
 							currentInstanceTimestamp,
 							bidirectional,
 							packet,
@@ -136,10 +137,11 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 							packet.getDstPort(),
 							packet.getSrcPort(),
 							ACTIVITY_TIMEOUT
-						));
+						);
+						flowState.update(newFlow);
                     } else {
                         // Packet only has SYN, no ACK
-						flowState.update(new Flow(
+						newFlow = new Flow(
 							currentInstanceTimestamp,
 							bidirectional,
 							packet,
@@ -148,7 +150,8 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 							packet.getSrcPort(),
 							packet.getDstPort(),
 							ACTIVITY_TIMEOUT
-						));
+						);
+						flowState.update(newFlow);
                     }
                 } else {
                     // Otherwise, the previous flow was likely terminated because of a timeout, and
@@ -157,7 +160,7 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
                     // (since they're part of the
                     // same TCP connection or UDP "dialogue".
 					Set<TCPRetransmission> tcpPacketsSeenCopy = new HashSet<>(flow.getTcpPacketsSeen()); 
-                    Flow newFlow = new Flow(
+                    newFlow = new Flow(
 						currentInstanceTimestamp,
 						bidirectional,
 						packet,
@@ -175,7 +178,7 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
                     // newFlow.setCumulativeConnectionDuration(currDuration);
 					flowState.update(newFlow);
                 }
-				triggerTimer(flow, ctx);
+				triggerTimer(newFlow, ctx);
 			} else if (flow.getTcpFlowState() == TCPFlowState.READY_FOR_TERMINATION) {
 				// Ignore packets after termination and before SYN
 				return;
@@ -221,9 +224,10 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
                 flowState.update(flow);
     		}
     	} else {
+			Flow newFlow = null;
 			if (packet.isFlagSYN() && packet.isFlagACK()) {
 				// Backward
-				flowState.update(new Flow(
+				newFlow = new Flow(
 					currentInstanceTimestamp,
 					bidirectional,
 					packet,
@@ -232,17 +236,19 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 					packet.getDstPort(),
 					packet.getSrcPort(),
 					ACTIVITY_TIMEOUT
-				));
+				);
+				flowState.update(newFlow);
             } else {
 				// Forward
-				flowState.update(new Flow(
+				newFlow = new Flow(
 					currentInstanceTimestamp,	
 					bidirectional,
 					packet,
 					ACTIVITY_TIMEOUT
-				));
+				);
+				flowState.update(newFlow);
             }
-			triggerTimer(flow, ctx);
+			triggerTimer(newFlow, ctx);
     	}
     }
 
