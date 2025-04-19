@@ -246,7 +246,6 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 	private void triggerTimer(Flow flow, KeyedProcessFunction<String, PacketInfo, Flow>.Context ctx) throws Exception {
 		TimerParams timerParams = timerState.value();
 		if (timerParams != null) {
-			System.out.println("[DEBUG TIMER PARAMS] " + timerParams.toString());
 			ctx.timerService().deleteProcessingTimeTimer(timerParams.getTimestamp());
 		}
 
@@ -254,7 +253,6 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 		long triggerTime = ctx.timerService().currentProcessingTime() + (delay / 1000L);
 		ctx.timerService().registerProcessingTimeTimer(triggerTime);
 		
-		System.out.println("[DEBUG TIMERSTATE] " + Boolean.toString(timerState == null));
 		timerState.update(new TimerParams(triggerTime, flow.getFlowId()));
 	}
 
