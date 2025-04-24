@@ -12,10 +12,12 @@ public class OrderedMode implements StreamMode {
     @Override
     public DataStream<FlowStats> createPipeline(StreamSource source) {
         return source.getSourceStream()
-				.map(new ExtractPacketInfo())
+				.flatMap(new ExtractPacketInfo())
 				.keyBy(packetInfo -> {
+					if (packetInfo == null) {
+						System.out.println("[UNEXPECTED] Packet Info is null");
+					}
 					String id = packetInfo.getPublisherId() + "-" + packetInfo.getFlowBidirectionalId();
-					// System.out.println("ACCESSED: " + id);
 					return id;
 				})
 				.process(new FlowGenerator(true))
