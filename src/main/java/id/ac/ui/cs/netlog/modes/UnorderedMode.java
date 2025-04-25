@@ -14,7 +14,7 @@ public class UnorderedMode implements StreamMode {
     @Override
     public DataStream<FlowStats> createPipeline(StreamSource source) {
         return source.getSourceStream()
-				.map(new ExtractPacketInfo())
+				.flatMap(new ExtractPacketInfo())
 				.keyBy(packetInfo -> {
 					String id = packetInfo.getPublisherId() + "-" + packetInfo.getFlowBidirectionalId();
 					// System.out.println(id);

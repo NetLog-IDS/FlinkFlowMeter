@@ -1,5 +1,7 @@
 package id.ac.ui.cs.netlog.source;
 
+import java.time.Duration;
+
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.connector.kafka.source.KafkaSource;
@@ -40,6 +42,11 @@ public class KafkaStreamSource implements StreamSource {
 			.setStartingOffsets(OffsetsInitializer.earliest())
 			.setValueOnlyDeserializer(new PacketDeserializationSchema(this.objectMapper))
 			.build();
-		return env.fromSource(source, WatermarkStrategy.noWatermarks(), "Kafka Source");
+		
+		return env.fromSource(source, WatermarkStrategy.noWatermarks(), "Kafka Source")
+				.assignTimestampsAndWatermarks(
+					WatermarkStrategy.<Packet>forMonotonousTimestamps()
+					.withTimestampAssigner((event, timestamp) -> (event.getTimestamp() / 1000L))
+				);
 	}
 }

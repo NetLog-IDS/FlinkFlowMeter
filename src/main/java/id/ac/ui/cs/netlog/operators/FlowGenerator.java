@@ -10,6 +10,7 @@ import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.streaming.api.TimeDomain;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
 
@@ -47,7 +48,7 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 	private static final List<ProtocolEnum> TCP_UDP_LIST_FILTER = Arrays.asList(ProtocolEnum.TCP, ProtocolEnum.UDP);
 
 	private transient ValueState<Flow> flowState;
-	private transient ValueState<TimerParams> timerState;
+	// private transient ValueState<TimerParams> timerState;
 
 	private boolean bidirectional;
 	
@@ -61,12 +62,12 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
 			"flowState",
 			TypeInformation.of(new TypeHint<Flow>() {})
 		);
-		ValueStateDescriptor<TimerParams> timerDescriptor = new ValueStateDescriptor<>(
-			"timerState",
-			TypeInformation.of(new TypeHint<TimerParams>() {})
-		);
+		// ValueStateDescriptor<TimerParams> timerDescriptor = new ValueStateDescriptor<>(
+		// 	"timerState",
+		// 	TypeInformation.of(new TypeHint<TimerParams>() {})
+		// );
 		flowState = getRuntimeContext().getState(flowDescriptor);
-		timerState = getRuntimeContext().getState(timerDescriptor);
+		// timerState = getRuntimeContext().getState(timerDescriptor);
 	}
 
 	@Override
@@ -253,33 +254,45 @@ public class FlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow
     }
 
 	private void triggerTimer(Flow flow, KeyedProcessFunction<String, PacketInfo, Flow>.Context ctx) throws Exception {
-		TimerParams timerParams = timerState.value();
-		if (timerParams != null) {
-			ctx.timerService().deleteProcessingTimeTimer(timerParams.getTimestamp());
-		}
+		// TimerParams timerParams = timerState.value();
+		// if (timerParams != null) {
+		// 	ctx.timerService().deleteProcessingTimeTimer(timerParams.getTimestamp());
+		// }
 
-		long delay = FLOW_TIMEOUT;
-		long triggerTime = ctx.timerService().currentProcessingTime() + (delay / 1000L);
-		ctx.timerService().registerProcessingTimeTimer(triggerTime);
+		// long debugTime = ctx.timerService().currentProcessingTime() + (FLOW_TIMEOUT / 1000L);
+		// ctx.timerService().registerProcessingTimeTimer(debugTime);
+		// ctx.timerService().registerProcessingTimeTimer(triggerTime);
+		// long triggerTime = ctx.timerService().currentWatermark() + (FLOW_TIMEOUT / 1000L) + 1000; // 1 seconds grace
+		long triggerTime = (flow.getFlowStartTime() / 1000L) + (FLOW_TIMEOUT / 1000L) + 5; // 5 milliseconds grace
+		// System.out.println("[TRIGGERINGZ] " + flow.getFlowStartTime() + " " + ctx.timerService().currentWatermark());
+		ctx.timerService().registerEventTimeTimer(triggerTime);
 		
-		timerState.update(new TimerParams(triggerTime, flow.getFlowId()));
+		// timerState.update(new TimerParams(triggerTime, flow.getFlowId()));
 	}
 
     @Override
     public void onTimer(long timestamp, OnTimerContext ctx, Collector<Flow> out) throws Exception {
+		// if (ctx.timeDomain() == TimeDomain.PROCESSING_TIME) {
+		// 	// System.out.println("[DEBUGOS] " + flowState.value());
+		// 	return;
+		// } else {
+		// 	System.out.println("[DEBUGIS] " + timestamp);
+		// }
+
 		Flow flow = flowState.value();
 		if (flow == null) return;
+		if ((timestamp - (flow.getFlowStartTime() / 1000L)) <= (FLOW_TIMEOUT / 1000L)) return;
 
-		TimerParams params = timerState.value();
-		if (params == null) {
-			System.out.println("[UNEXPECTED BEHAVIOR] Params is null");
-			return;
-		}
-		if (!params.getFlowId().equals(flow.getFlowId())) {
-			System.out.println("[UNEXPECTED BEHAVIOR] Flow id is different");
-			return;
-		}
-		timerState.update(null);
+		// TimerParams params = timerState.value();
+		// if (params == null) {
+		// 	System.out.println("[UNEXPECTED BEHAVIOR] Params is null");
+		// 	return;
+		// }
+		// if (!params.getFlowId().equals(flow.getFlowId())) {
+		// 	System.out.println("[UNEXPECTED BEHAVIOR] Flow id is different");
+		// 	return;
+		// }
+		// timerState.update(null);
 
 		// Flow finished due flowtimeout:
 		// 1.- we move the flow to finished flow list

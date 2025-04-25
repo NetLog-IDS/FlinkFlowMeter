@@ -74,7 +74,7 @@ public class ExtractPacketInfo implements FlatMapFunction<Packet, PacketInfo> {
 				}
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
+			// e.printStackTrace();
 			return null;
 		}
 		return packetInfo;
