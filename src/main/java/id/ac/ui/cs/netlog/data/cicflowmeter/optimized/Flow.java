@@ -22,8 +22,8 @@ public class Flow {
 
 	private Long forwardBytes;
 	private Long backwardBytes;
-	private Long fHeaderBytes;
-	private Long bHeaderBytes;
+	private Long fwdHeaderBytes;
+	private Long bwdHeaderBytes;
 	
 	private boolean bidirectional;
 
@@ -32,25 +32,18 @@ public class Flow {
 	// Flags
 	private Integer fwdFINCount;
     private Integer bwdFINCount;
-
 	private Integer fwdSYNCount;
 	private Integer bwdSYNCount;
-
 	private Integer fwdRSTCount;
     private Integer bwdRSTCount;
-
     private Integer fwdPSHCount;
     private Integer bwdPSHCount;
-
 	private Integer fwdACKCount;
     private Integer bwdACKCount;
-
     private Integer fwdURGCount;
     private Integer bwdURGCount;
-
 	private Integer fwdCWRCount;
     private Integer bwdCWRCount;
-
 	private Integer fwdECECount;
     private Integer bwdECECount;
 
@@ -217,8 +210,8 @@ public class Flow {
 		this.fwdECECount = 0;
         this.bwdECECount = 0;
 		
-        this.fHeaderBytes = 0L;
-        this.bHeaderBytes = 0L;
+        this.fwdHeaderBytes = 0L;
+        this.bwdHeaderBytes = 0L;
         // this.cumulativeConnectionDuration = 0L;
         this.tcpFlowState = null;
         // this.tcpPacketsSeen = new HashSet<TCPRetransmission>();
@@ -251,7 +244,7 @@ public class Flow {
 			this.fwdMinSegSize = packet.getHeaderBytes();
 			this.fwdInitWinBytes = packet.getTCPWindow();
 			this.fwdPktStats.add(packet.getPayloadBytes());
-			this.fHeaderBytes = packet.getHeaderBytes();
+			this.fwdHeaderBytes = packet.getHeaderBytes();
 			this.forwardLastSeen = packet.getTimeStamp();
 			this.forwardBytes += packet.getPayloadBytes();
 			// this.forward.add(packet);
@@ -286,7 +279,7 @@ public class Flow {
 			this.bwdMinSegSize = packet.getHeaderBytes();
 			this.bwdInitWinBytes = packet.getTCPWindow();
 			this.bwdPktStats.add(packet.getPayloadBytes());
-			this.bHeaderBytes = packet.getHeaderBytes();
+			this.bwdHeaderBytes = packet.getHeaderBytes();
 			this.backwardLastSeen = packet.getTimeStamp();
 			this.backwardBytes += packet.getPayloadBytes();
 			// this.backward.add(packet);
@@ -364,7 +357,7 @@ public class Flow {
 					this.fwdActDataPkt++;
 				}
 				this.fwdPktStats.add(packet.getPayloadBytes());
-				this.fHeaderBytes += packet.getHeaderBytes();
+				this.fwdHeaderBytes += packet.getHeaderBytes();
     			// this.forward.add(packet);   
     			this.forwardBytes += packet.getPayloadBytes();
     			if (this.fwdPktStats.calculateCount() > 1)
@@ -406,7 +399,7 @@ public class Flow {
                 if (this.bwdInitWinBytes == 0) {
                     this.bwdInitWinBytes = packet.getTCPWindow();
                 }
-				this.bHeaderBytes += packet.getHeaderBytes();
+				this.bwdHeaderBytes += packet.getHeaderBytes();
     			// this.backward.add(packet);
     			this.backwardBytes += packet.getPayloadBytes();
     			if (this.bwdPktStats.calculateCount() > 1)
@@ -444,7 +437,7 @@ public class Flow {
 			}
 			this.fwdPktStats.add(packet.getPayloadBytes());
 			this.flowLengthStats.add(packet.getPayloadBytes());
-			this.fHeaderBytes += packet.getHeaderBytes();
+			this.fwdHeaderBytes += packet.getHeaderBytes();
     		// this.forward.add(packet);    		
     		this.forwardBytes += packet.getPayloadBytes();
     		this.forwardIAT.add(currentTimestamp - this.forwardLastSeen);
@@ -456,49 +449,56 @@ public class Flow {
     	this.flowLastSeen = Math.max(this.flowLastSeen, packet.getTimeStamp());
     }
 
-// 	public double getfPktsPerSecond() {
-// 		long duration = this.flowLastSeen - this.flowStartTime;
-// 		if (duration > 0) {
-// 			return (this.forward.size() / ((double) duration / 1000000L));
-// 		}
-// 		else
-// 			return 0;
-// 	}
+	public Double calculateFwdPktsPerSecond() {
+		long duration = this.flowLastSeen - this.flowStartTime;
+		if (duration > 0) {
+			return (calculateFwdPacketCount() / ((double) duration / 1000000L));
+			// return (this.forward.size() / ((double) duration / 1000000L));
+		} else {
+			return 0.0;
+		}
+	}
 
-// 	public double getbPktsPerSecond() {
-// 		long duration = this.flowLastSeen - this.flowStartTime;
-// 		if (duration > 0) {
-// 			return (this.backward.size() / ((double) duration / 1000000L));
-// 		}
-// 		else
-// 			return 0;
-// 	}
+	public double calculateBwdPktsPerSecond() {
+		long duration = this.flowLastSeen - this.flowStartTime;
+		if (duration > 0) {
+			return (calculateBwdPacketCount() / ((double) duration / 1000000L));
+			// return (this.backward.size() / ((double) duration / 1000000L));
+		}
+		else {
+			return 0;
+		}
+	}
 
-// 	public double getDownUpRatio() {
-// 		if (this.forward.size() > 0) {
-// 			return ((double)this.backward.size())/this.forward.size();
-// 		}
-// 		return 0;
-// 	}
+	public Double calculateDownUpRatio() {
+		if (calculateFwdPacketCount() > 0) {
+			return ((double) calculateBwdPacketCount()) / calculateFwdPacketCount();
+			// return ((double) this.backward.size())/this.forward.size();
+		}
+		return 0.0;
+	}
 
-// 	public double getAvgPacketSize() {
-// 		if (this.packetCount() > 0) {
-// 			return (this.flowLengthStats.getSum() / this.packetCount());
-// 		}
-// 		return 0;
-// 	}
+	public Double calculateAvgPacketSize() {
+		if (calculatePacketCount() > 0) {
+			return ((double) this.flowLengthStats.calculateSum()) / calculatePacketCount();
+			// return (this.flowLengthStats.getSum() / this.packetCount());
+		}
+		return 0.0;
+	}
 
-// 	public double fAvgSegmentSize() {
-// 		if (this.forward.size() != 0)
-// 			return (this.fwdPktStats.getSum() / (double) this.forward.size());
-// 		return 0;
-// 	}
+	public Double calculateFwdAvgSegmentSize() {
+		if (calculateFwdPacketCount() != 0)
+			return (this.fwdPktStats.calculateSum() / (double) calculateFwdPacketCount());
+			// return (this.fwdPktStats.getSum() / (double) this.forward.size());
+		return 0.0;
+	}
 
-// 	public double bAvgSegmentSize() {
-// 		if (this.backward.size() != 0)
-// 			return (this.bwdPktStats.getSum() / (double) this.backward.size());
-// 		return 0;
-// 	}
+	public Double calculateBwdAvgSegmentSize() {
+		if (calculateBwdPacketCount() != 0)
+			return (this.bwdPktStats.calculateSum() / (double) calculateBwdPacketCount());
+			// return (this.bwdPktStats.getSum() / (double) this.backward.size());
+		return 0.0;
+	}
 
 //     public void initFlags() {
 // 		flagCounts.put("FIN", new MutableInt());
@@ -671,51 +671,63 @@ public class Flow {
 		return this.fwdBulkDuration / (double) 1000000;
 	}
 
-//     //Client average bytes per bulk
-//     public double fAvgBytesPerBulk() {
-//         if (this.fbulkStateCount() != 0)
-//             return ((double) this.fbulkSizeTotal() / this.fbulkStateCount());
-//         return 0;
-//     }
+    // Client average bytes per bulk
+    public Double calculateFwdAvgBytesPerBulk() {
+        if (this.fwdBulkStateCount != 0) {
+			return ((double) this.fwdBulkSizeTotal / this.fwdBulkStateCount);
+			// return ((double) this.fbulkSizeTotal() / this.fbulkStateCount());
+		}
+        return 0.0;
+    }
 
-//     //Client average packets per bulk
-//     public double fAvgPacketsPerBulk() {
-//         if (this.fbulkStateCount() != 0)
-//             return ((double) this.fbulkPacketCount() / this.fbulkStateCount());
-//         return 0;
-//     }
+    // Client average packets per bulk
+    public Double calculateFwdAvgPacketsPerBulk() {
+        if (this.fwdBulkStateCount != 0) {
+			return ((double) this.fwdBulkPacketCount / this.fwdBulkStateCount);
+			// return ((double) this.fbulkPacketCount() / this.fbulkStateCount());
+		}
+        return 0.0;
+    }
 
-//     //Client average bulk rate
-//     public double fAvgBulkRate() {
-//         if (this.fbulkDuration() != 0)
-//             return ((double) this.fbulkSizeTotal() / this.fbulkDurationInSecond());
-//         return 0;
-//     }
+    // Client average bulk rate
+    public Double calculateFwdAvgBulkRate() {
+        if (this.fwdBulkDuration != 0) {
+			return ((double) this.fwdBulkSizeTotal / calculateFwdBulkDurationInSecond());
+			// return ((double) this.fbulkSizeTotal() / this.fbulkDurationInSecond());
+		}
+        return 0.0;
+    }
 
 	public Double calculateBwdBulkDurationInSecond() {
 		return this.bwdBulkDuration / (double) 1000000;
 	}
 
-//     //Server average bytes per bulk
-//     public double bAvgBytesPerBulk() {
-//         if (this.bbulkStateCount() != 0)
-//             return ((double) this.bbulkSizeTotal() / this.bbulkStateCount());
-//         return 0;
-//     }
+    //Server average bytes per bulk
+    public Double calculateBwdAvgBytesPerBulk() {
+        if (this.bwdBulkStateCount != 0) {
+			return ((double) this.bwdBulkSizeTotal / this.bwdBulkStateCount);
+			// return ((double) this.bbulkSizeTotal() / this.bbulkStateCount());
+		}   
+        return 0.0;
+    }
 
-//     //Server average packets per bulk
-//     public double bAvgPacketsPerBulk() {
-//         if (this.bbulkStateCount() != 0)
-//             return ((double) this.bbulkPacketCount() / this.bbulkStateCount());
-//         return 0;
-//     }
+    //Server average packets per bulk
+    public Double calculateBwdAvgPacketsPerBulk() {
+        if (this.bwdBulkStateCount != 0) {
+			return ((double) this.bwdBulkPacketCount / this.bwdBulkStateCount);
+			// return ((double) this.bbulkPacketCount() / this.bbulkStateCount());
+		}   
+        return 0.0;
+    }
 
-//     //Server average bulk rate
-//     public double bAvgBulkRate() {
-//         if (this.bbulkDuration() != 0)
-//             return ((double) this.bbulkSizeTotal() / this.bbulkDurationInSecond());
-//         return 0;
-//     }
+    //Server average bulk rate
+    public Double calculateBwdAvgBulkRate() {
+        if (this.bwdBulkDuration != 0) {
+			return ((double) this.bwdBulkSizeTotal / calculateBwdBulkDurationInSecond());
+			// return ((double) this.bbulkSizeTotal() / this.bbulkDurationInSecond());
+		}
+        return 0.0;
+    }
 
     public void updateActiveIdleTime(long currentTime, long threshold) {
         if ((currentTime - this.endActiveTime) > threshold) {
@@ -740,13 +752,23 @@ public class Flow {
 //         }
 //     }
     
-//     public int packetCount(){
-//     	if (isBidirectional) {
-//     		return (this.forward.size() + this.backward.size()); 
-//     	} else {
-//     		return this.forward.size();    		
-//     	}
-//     }
+    public Integer calculatePacketCount(){
+    	if (this.bidirectional) {
+			return calculateFwdPacketCount() + calculateBwdPacketCount();
+    		// return (this.forward.size() + this.backward.size()); 
+    	} else {
+			return calculateFwdPacketCount();
+    		// return this.forward.size();
+    	}
+    }
+
+	public Integer calculateFwdPacketCount() {
+		return this.fwdPktStats.calculateCount().intValue();
+	}
+
+	public Integer calculateBwdPacketCount() {
+		return this.bwdPktStats.calculateCount().intValue();
+	}
 
 // 	public boolean isBidirectional() {
 //         return isBidirectional;
@@ -921,14 +943,6 @@ public class Flow {
 	
 // 	public int getBwdFINFlags() {
 // 		return bFIN_cnt;
-// 	}
-	
-// 	public long getFwdHeaderLength() {
-// 		return fHeaderBytes;
-// 	}
-	
-// 	public long getBwdHeaderLength() {
-// 		return bHeaderBytes;
 // 	}
 	
 //     public double getMinPacketLength() {

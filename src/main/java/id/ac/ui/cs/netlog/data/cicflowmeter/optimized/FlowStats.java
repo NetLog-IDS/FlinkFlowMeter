@@ -139,12 +139,12 @@ public class FlowStats {
     
     public FlowStats(Flow flow) {
         // Basic flow identifiers
+        this.fid = flow.getFlowId();
         this.srcIp = PacketUtils.byteArrayToIp(flow.getSrc());
         this.srcPort = flow.getSrcPort();
         this.dstIp = PacketUtils.byteArrayToIp(flow.getDst());
         this.dstPort = flow.getDstPort();
         this.protocol = flow.getProtocol().val;
-        this.fid = this.srcIp + "-" + this.dstIp + "-" + this.srcPort + "-" + this.dstPort + "-" + this.protocol;
         
         // Timestamp
         this.timestamp = DateUtils.convertEpochTimestamp2String(flow.getFlowStartTime());
@@ -169,123 +169,129 @@ public class FlowStats {
         
         // Backward packets
         if (flow.getBwdPktStats().calculateCount() > 0L) {
-            this.bwdPacketLengthMax = flow.getBwdPktStats().calculateMax(); // TODO: check double or not
-            this.bwdPacketLengthMin = flow.getBwdPktStats().calculateMin(); // TODO: check double or not
+            this.bwdPacketLengthMax = flow.getBwdPktStats().calculateMax();
+            this.bwdPacketLengthMin = flow.getBwdPktStats().calculateMin();
             this.bwdPacketLengthMean = flow.getBwdPktStats().calculateAvg();
             this.bwdPacketLengthStd = flow.getBwdPktStats().calculateStd();
         }
 
         // Flow rates
-        // if (flowDuration != 0) {
-        //     this.flowBytesPerSec = ((double) (flow.getForwardBytes() + flow.getBackwardBytes())) / ((double) flowDuration / 1000000L);
-        //     this.flowPacketsPerSec = ((double) flow.packetCount()) / ((double) flowDuration / 1000000L);
-        // } else {
-        //     this.flowBytesPerSec = -1;
-        //     this.flowPacketsPerSec = -1;
-        // }
+        if (this.flowDuration != 0) {
+            this.flowBytesPerSec = ((double) (flow.getForwardBytes() + flow.getBackwardBytes())) / ((double) this.flowDuration / 1000000L);
+            this.flowPacketsPerSec = ((double) flow.calculatePacketCount()) / ((double) this.flowDuration / 1000000L);
+        } else {
+            this.flowBytesPerSec = -1;
+            this.flowPacketsPerSec = -1;
+        }
         
         // Flow IAT
+        // TODO: check for NaN handling
+        // TODO: get to calculate
+        this.flowIatMean = flow.getFlowIAT().calculateAvg();
+        this.flowIatStd = flow.getFlowIAT().calculateStd();
+        this.flowIatMax = flow.getFlowIAT().calculateMax().equals(Long.MIN_VALUE) ? 0 : flow.getFlowIAT().calculateMax();
+        this.flowIatMin = flow.getFlowIAT().calculateMin().equals(Long.MAX_VALUE) ? 0 : flow.getFlowIAT().calculateMin();
         // this.flowIatMean = Double.isNaN(flow.getFlowIAT().getMean()) ? 0 : flow.getFlowIAT().getMean();
         // this.flowIatStd = Double.isNaN(flow.getFlowIAT().getStandardDeviation()) ? 0 : flow.getFlowIAT().getStandardDeviation();
         // this.flowIatMax = Double.isNaN(flow.getFlowIAT().getMax()) ? 0 : flow.getFlowIAT().getMax();
         // this.flowIatMin = Double.isNaN(flow.getFlowIAT().getMin()) ? 0 : flow.getFlowIAT().getMin();
         
         // Forward IAT
-        // if (flow.getForward().size() > 1) {
-        //     this.fwdIatTotal = flow.getForwardIAT().getSum();
-        //     this.fwdIatMean = flow.getForwardIAT().getMean();
-        //     this.fwdIatStd = flow.getForwardIAT().getStandardDeviation();
-        //     this.fwdIatMax = flow.getForwardIAT().getMax();
-        //     this.fwdIatMin = flow.getForwardIAT().getMin();
-        // }
+        if (flow.calculateFwdPacketCount() > 1) {
+            this.fwdIatTotal = flow.getForwardIAT().calculateSum();
+            this.fwdIatMean = flow.getForwardIAT().calculateAvg();
+            this.fwdIatStd = flow.getForwardIAT().calculateStd();
+            this.fwdIatMax = flow.getForwardIAT().calculateMax();
+            this.fwdIatMin = flow.getForwardIAT().calculateMin();
+        }
         
         // // Backward IAT
-        // if (flow.getBackward().size() > 1) {
-        //     this.bwdIatTotal = flow.getBackwardIAT().getSum();
-        //     this.bwdIatMean = flow.getBackwardIAT().getMean();
-        //     this.bwdIatStd = flow.getBackwardIAT().getStandardDeviation();
-        //     this.bwdIatMax = flow.getBackwardIAT().getMax();
-        //     this.bwdIatMin = flow.getBackwardIAT().getMin();
-        // }
+        if (flow.calculateBwdPacketCount() > 1) {
+            this.bwdIatTotal = flow.getBackwardIAT().calculateSum();
+            this.bwdIatMean = flow.getBackwardIAT().calculateAvg();
+            this.bwdIatStd = flow.getBackwardIAT().calculateStd();
+            this.bwdIatMax = flow.getBackwardIAT().calculateMax();
+            this.bwdIatMin = flow.getBackwardIAT().calculateMin();
+        }
         
         // // Flag counts
-        // this.fwdPshFlags = flow.getFPSH_cnt();
-        // this.bwdPshFlags = flow.getBPSH_cnt();
-        // this.fwdUrgFlags = flow.getFURG_cnt();
-        // this.bwdUrgFlags = flow.getBURG_cnt();
-        // this.fwdRstFlags = flow.getFRST_cnt();
-        // this.bwdRstFlags = flow.getBRST_cnt();
+        this.fwdPshFlags = flow.getFwdPSHCount();
+        this.bwdPshFlags = flow.getBwdPSHCount();
+        this.fwdUrgFlags = flow.getFwdURGCount();
+        this.bwdUrgFlags = flow.getBwdURGCount();
+        this.fwdRstFlags = flow.getFwdRSTCount();
+        this.bwdRstFlags = flow.getBwdRSTCount();
 
         // Header lengths
-        this.fwdHeaderLength = flow.getFHeaderBytes();
-        this.bwdHeaderLength = flow.getBHeaderBytes();
+        this.fwdHeaderLength = flow.getFwdHeaderBytes();
+        this.bwdHeaderLength = flow.getBwdHeaderBytes();
         
         // Packet rates
-        // this.fwdPacketsPerSec = flow.getfPktsPerSecond();
-        // this.bwdPacketsPerSec = flow.getbPktsPerSecond();
+        this.fwdPacketsPerSec = flow.calculateFwdPktsPerSecond();
+        this.bwdPacketsPerSec = flow.calculateBwdPktsPerSecond();
         
         // Flow length statistics
-        // if (flow.getForward().size() > 0 || flow.getBackward().size() > 0) {
-        //     this.packetLengthMin = flow.getFlowLengthStats().getMin();
-        //     this.packetLengthMax = flow.getFlowLengthStats().getMax();
-        //     this.packetLengthMean = flow.getFlowLengthStats().getMean();
-        //     this.packetLengthStd = flow.getFlowLengthStats().getStandardDeviation();
-        //     this.packetLengthVar = flow.getFlowLengthStats().getVariance();
-        // }
+        if (flow.calculateFwdPacketCount() > 0 || flow.calculateBwdPacketCount() > 0) {
+            this.packetLengthMin = flow.getFlowLengthStats().calculateMin();
+            this.packetLengthMax = flow.getFlowLengthStats().calculateMax();
+            this.packetLengthMean = flow.getFlowLengthStats().calculateAvg();
+            this.packetLengthStd = flow.getFlowLengthStats().calculateStd();
+            this.packetLengthVar = flow.getFlowLengthStats().calculateVariance();
+        }
 
-        // // TCP Flag counts
-        // this.finCount = flow.getFlagCounts().get("FIN").getValue();
-        // this.synCount = flow.getFlagCounts().get("SYN").getValue();
-        // this.rstCount = flow.getFlagCounts().get("RST").getValue();
-        // this.pshCount = flow.getFlagCounts().get("PSH").getValue();
-        // this.ackCount = flow.getFlagCounts().get("ACK").getValue();
-        // this.urgCount = flow.getFlagCounts().get("URG").getValue();
-        // this.cwrCount = flow.getFlagCounts().get("CWR").getValue();
-        // this.eceCount = flow.getFlagCounts().get("ECE").getValue();
+        // TCP Flag counts
+        this.finCount = flow.getFwdFINCount() + flow.getBwdFINCount();
+        this.synCount = flow.getFwdSYNCount() + flow.getBwdSYNCount();
+        this.rstCount = flow.getFwdRSTCount() + flow.getBwdRSTCount();
+        this.pshCount = flow.getFwdPSHCount() + flow.getBwdPSHCount();
+        this.ackCount = flow.getFwdACKCount() + flow.getBwdACKCount();
+        this.urgCount = flow.getFwdURGCount() + flow.getBwdURGCount();
+        this.cwrCount = flow.getFwdCWRCount() + flow.getBwdCWRCount();
+        this.eceCount = flow.getFwdECECount() + flow.getBwdECECount();
         
-        // // Additional metrics
-        // this.downUpRatio = flow.getDownUpRatio();
-        // this.avgPacketSize = flow.getAvgPacketSize();
-        // this.fwdSegmentSizeAvg = flow.fAvgSegmentSize();
-        // this.bwdSegmentSizeAvg = flow.bAvgSegmentSize();
+        // Additional metrics
+        this.downUpRatio = flow.calculateDownUpRatio();
+        this.avgPacketSize = flow.calculateAvgPacketSize();
+        this.fwdSegmentSizeAvg = flow.calculateFwdAvgSegmentSize();
+        this.bwdSegmentSizeAvg = flow.calculateBwdAvgSegmentSize();
         
-        // // Bulk statistics
-        // this.fwdBytesPerBulkAvg = flow.fAvgBytesPerBulk();
-        // this.fwdPacketsPerBulkAvg = flow.fAvgPacketsPerBulk();
-        // this.fwdBulkRateAvg = flow.fAvgBulkRate();
-        // this.bwdBytesPerBulkAvg = flow.bAvgBytesPerBulk();
-        // this.bwdPacketsPerBulkAvg = flow.bAvgPacketsPerBulk();
-        // this.bwdBulkRateAvg = flow.bAvgBulkRate();
+        // Bulk statistics
+        this.fwdBytesPerBulkAvg = flow.calculateFwdAvgBytesPerBulk();
+        this.fwdPacketsPerBulkAvg = flow.calculateFwdAvgPacketsPerBulk();
+        this.fwdBulkRateAvg = flow.calculateFwdAvgBulkRate();
+        this.bwdBytesPerBulkAvg = flow.calculateBwdAvgBytesPerBulk();
+        this.bwdPacketsPerBulkAvg = flow.calculateBwdAvgPacketsPerBulk();
+        this.bwdBulkRateAvg = flow.calculateBwdAvgBulkRate();
 
-        // // Subflow statistics
-        // this.subflowFwdPackets = flow.getSflow_fpackets();
-        // this.subflowFwdBytes = flow.getSflow_fbytes();
-        // this.subflowBwdPackets = flow.getSflow_bpackets();
-        // this.subflowBwdBytes = flow.getSflow_bbytes();
+        // Subflow statistics
+        this.subflowFwdPackets = flow.calculateSubflowFwdPackets();
+        this.subflowFwdBytes = flow.calculateSubflowFwdBytes();
+        this.subflowBwdPackets = flow.calculateSubflowBwdPackets();
+        this.subflowBwdBytes = flow.calculateSubflowBwdBytes();
         
-        // // Window statistics
-        // this.fwdInitWinBytes = flow.getInit_Win_bytes_forward();
-        // this.bwdInitWinBytes = flow.getInit_Win_bytes_backward();
-        // this.fwdActDataPackets = flow.getAct_data_pkt_forward();
-        // this.bwdActDataPackets = flow.getAct_data_pkt_backward();
-        // this.fwdSegSizeMin = flow.getmin_seg_size_forward();
-        // this.bwdSegSizeMin = flow.getmin_seg_size_backward();
+        // Window statistics
+        this.fwdInitWinBytes = flow.getFwdInitWinBytes();
+        this.bwdInitWinBytes = flow.getBwdInitWinBytes();
+        this.fwdActDataPackets = flow.getFwdActDataPkt();
+        this.bwdActDataPackets = flow.getBwdActDataPkt();
+        this.fwdSegSizeMin = flow.getFwdMinSegSize();
+        this.bwdSegSizeMin = flow.getBwdMinSegSize();
         
-        // if (flow.getFlowActive().getN() > 0) {
-        //     // Active statistics
-        //     this.activeMean = flow.getFlowActive().getMean();
-        //     this.activeStd = flow.getFlowActive().getStandardDeviation();
-        //     this.activeMax = flow.getFlowActive().getMax();
-        //     this.activeMin = flow.getFlowActive().getMin();
-        // }
+        // Active statistics
+        if (flow.getFlowActive().calculateCount() > 0) {
+            this.activeMean = flow.getFlowActive().calculateAvg();
+            this.activeStd = flow.getFlowActive().calculateStd();
+            this.activeMax = flow.getFlowActive().calculateMax();
+            this.activeMin = flow.getFlowActive().calculateMin();
+        }
         
-        // // Idle statistics
-        // if (flow.getFlowIdle().getN() > 0) {
-        //     this.idleMean = flow.getFlowIdle().getMean();
-        //     this.idleStd = flow.getFlowIdle().getStandardDeviation();
-        //     this.idleMax = flow.getFlowIdle().getMax();
-        //     this.idleMin = flow.getFlowIdle().getMin();
-        // }
+        // Idle statistics
+        if (flow.getFlowIdle().calculateCount() > 0) {
+            this.idleMean = flow.getFlowIdle().calculateAvg();
+            this.idleStd = flow.getFlowIdle().calculateStd();
+            this.idleMax = flow.getFlowIdle().calculateMax();
+            this.idleMin = flow.getFlowIdle().calculateMin();
+        }
 
         // this.icmpCode = flow.getIcmpCode();
         // this.icmpType = flow.getIcmpType();
