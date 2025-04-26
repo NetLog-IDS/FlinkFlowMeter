@@ -87,22 +87,22 @@ public class Flow {
     private int subflowCount = 0;
     // private long sfAcHelper = -1;
 	
-// 	private long fbulkDuration = 0;
-// 	private long fbulkPacketCount = 0;
-// 	private long fbulkSizeTotal = 0;
-// 	private long fbulkStateCount = 0;
-// 	private long fbulkPacketCountHelper = 0;
-// 	private long fbulkStartHelper = 0;
-// 	private long fbulkSizeHelper = 0;
-// 	private long flastBulkTS = 0;
-// 	private long bbulkDuration = 0;
-// 	private long bbulkPacketCount = 0;
-// 	private long bbulkSizeTotal = 0;
-// 	private long bbulkStateCount = 0;
-// 	private long bbulkPacketCountHelper = 0;
-// 	private long bbulkStartHelper = 0;
-// 	private long bbulkSizeHelper = 0;
-// 	private long blastBulkTS = 0;
+	private long fwdBulkDuration = 0;
+	private long fwdBulkPacketCount = 0;
+	private long fwdBulkSizeTotal = 0;
+	private long fwdBulkStateCount = 0;
+	private long fwdBulkPacketCountHelper = 0;
+	private long fwdBulkStartHelper = 0;
+	private long fwdBulkSizeHelper = 0;
+	private long fwdLastBulkTime = 0;
+	private long bwdBulkDuration = 0;
+	private long bwdBulkPacketCount = 0;
+	private long bwdBulkSizeTotal = 0;
+	private long bwdBulkStateCount = 0;
+	private long bwdBulkPacketCountHelper = 0;
+	private long bwdBulkStartHelper = 0;
+	private long bwdBulkSizeHelper = 0;
+	private long bwdLastBulkTime = 0;
 
 // 	private int fwdTcpRetransCnt = 0;
 //     private int bwdTcpRetransCnt = 0;
@@ -235,7 +235,7 @@ public class Flow {
             this.dstPort = packet.getDstPort();
         }
 
-		// updateFlowBulk(packet);
+		updateFlowBulk(packet);
 		
 		// checkFlags(packet);
 
@@ -351,7 +351,7 @@ public class Flow {
 //     }
     
     public void addPacket(PacketInfo packet) {
-		// updateFlowBulk(packet);
+		updateFlowBulk(packet);
 		detectUpdateSubflows(packet);
 		// checkFlags(packet);
 		// handleTcpRetransmissionFields(packet);
@@ -574,117 +574,102 @@ public class Flow {
         this.subflowLastPacketTime = packet.getTimeStamp();
 	}
 
-// 	public void updateFlowBulk(PacketInfo packet) {
-// 		if (Arrays.equals(this.src, packet.getSrc())) {
-//             updateForwardBulk(packet, blastBulkTS);
-//         } else {
-//             updateBackwardBulk(packet,flastBulkTS);
-//         }
-// 	}
+	private void updateFlowBulk(PacketInfo packet) {
+		if (Arrays.equals(this.src, packet.getSrc())) {
+            updateForwardBulk(packet, bwdLastBulkTime);
+        } else {
+            updateBackwardBulk(packet, fwdLastBulkTime);
+        }
+	}
 
-// 	public void updateForwardBulk(PacketInfo packet, long tsOflastBulkInOther){
-//         long size = packet.getPayloadBytes();
-//         if (tsOflastBulkInOther > fbulkStartHelper) fbulkStartHelper = 0;
-//         if (size <= 0) return;
+	public void updateForwardBulk(PacketInfo packet, long lastBulkTimeInOther){
+        long size = packet.getPayloadBytes();
+        if (lastBulkTimeInOther > this.fwdBulkStartHelper) this.fwdBulkStartHelper = 0;
+        if (size <= 0) return;
 
-//         packet.getPayloadPacket();
+        packet.getPayloadPacket();
 
-//         if (fbulkStartHelper == 0) {
-//             fbulkStartHelper = packet.getTimeStamp();
-//             fbulkPacketCountHelper = 1;
-//             fbulkSizeHelper = size;
-//             flastBulkTS = packet.getTimeStamp();
-//         } //possible bulk
-//         else {
-//             // Too much idle time?
-//             if (((packet.getTimeStamp() - flastBulkTS) / (double) 1000000) > 1.0) {
-//                 fbulkStartHelper = packet.getTimeStamp();
-//                 flastBulkTS = packet.getTimeStamp();
-//                 fbulkPacketCountHelper = 1;
-//                 fbulkSizeHelper = size;
-//             }// Add to bulk
-//             else {
-//                 fbulkPacketCountHelper += 1;
-//                 fbulkSizeHelper += size;
-//                 //New bulk
-//                 if (fbulkPacketCountHelper == 4) {
-//                     fbulkStateCount += 1;
-//                     fbulkPacketCount += fbulkPacketCountHelper;
-//                     fbulkSizeTotal += fbulkSizeHelper;
-//                     fbulkDuration += packet.getTimeStamp() - fbulkStartHelper;
-//                 } //Continuation of existing bulk
-//                 else if (fbulkPacketCountHelper > 4) {
-//                     fbulkPacketCount += 1;
-//                     fbulkSizeTotal += size;
-//                     fbulkDuration += packet.getTimeStamp() - flastBulkTS;
-//                 }
-//                 flastBulkTS = packet.getTimeStamp();
-//             }
-//         }
-// 	}
+        if (this.fwdBulkStartHelper == 0) {
+            this.fwdBulkStartHelper = packet.getTimeStamp();
+            this.fwdBulkPacketCountHelper = 1;
+            this.fwdBulkSizeHelper = size;
+            this.fwdLastBulkTime = packet.getTimeStamp();
+        } // possible bulk
+        else {
+            // Too much idle time?
+            if (((packet.getTimeStamp() - this.fwdLastBulkTime) / (double) 1000000) > 1.0) {
+                this.fwdBulkStartHelper = packet.getTimeStamp();
+                this.fwdLastBulkTime = packet.getTimeStamp();
+                this.fwdBulkPacketCountHelper = 1;
+                this.fwdBulkSizeHelper = size;
+            } // Add to bulk
+            else {
+                this.fwdBulkPacketCountHelper += 1;
+                this.fwdBulkSizeHelper += size;
+                //New bulk
+                if (this.fwdBulkPacketCountHelper == 4) {
+                    this.fwdBulkStateCount += 1;
+                    this.fwdBulkPacketCount += this.fwdBulkPacketCountHelper;
+                    this.fwdBulkSizeTotal += this.fwdBulkSizeHelper;
+                    this.fwdBulkDuration += packet.getTimeStamp() - this.fwdBulkStartHelper;
+                } //Continuation of existing bulk
+                else if (this.fwdBulkPacketCountHelper > 4) {
+                    this.fwdBulkPacketCount += 1;
+                    this.fwdBulkSizeTotal += size;
+                    this.fwdBulkDuration += packet.getTimeStamp() - this.fwdLastBulkTime;
+                }
+                this.fwdLastBulkTime = packet.getTimeStamp();
+            }
+        }
+	}
 
-// 	public void updateBackwardBulk(PacketInfo packet , long tsOflastBulkInOther){
-// 		/*bAvgBytesPerBulk =0;
-// 		bbulkSizeTotal=0;
-// 		bbulkStateCount=0;*/
-//         long size = packet.getPayloadBytes();
-//         if (tsOflastBulkInOther > bbulkStartHelper) bbulkStartHelper = 0;
-//         if (size <= 0) return;
+	public void updateBackwardBulk(PacketInfo packet , long lastBulkTimeInOther){
+		/*bAvgBytesPerBulk =0;
+		bbulkSizeTotal=0;
+		bbulkStateCount=0;*/
+        long size = packet.getPayloadBytes();
+        if (lastBulkTimeInOther > this.bwdBulkStartHelper) this.bwdBulkStartHelper = 0;
+        if (size <= 0) return;
 
-//         packet.getPayloadPacket();
+        packet.getPayloadPacket();
 
-//         if (bbulkStartHelper == 0) {
-//             bbulkStartHelper = packet.getTimeStamp();
-//             bbulkPacketCountHelper = 1;
-//             bbulkSizeHelper = size;
-//             blastBulkTS = packet.getTimeStamp();
-//         } //possible bulk
-//         else {
-//             // Too much idle time?
-//             if (((packet.getTimeStamp() - blastBulkTS) / (double) 1000000) > 1.0) {
-//                 bbulkStartHelper = packet.getTimeStamp();
-//                 blastBulkTS = packet.getTimeStamp();
-//                 bbulkPacketCountHelper = 1;
-//                 bbulkSizeHelper = size;
-//             }// Add to bulk
-//             else {
-//                 bbulkPacketCountHelper += 1;
-//                 bbulkSizeHelper += size;
-//                 //New bulk
-//                 if (bbulkPacketCountHelper == 4) {
-//                     bbulkStateCount += 1;
-//                     bbulkPacketCount += bbulkPacketCountHelper;
-//                     bbulkSizeTotal += bbulkSizeHelper;
-//                     bbulkDuration += packet.getTimeStamp() - bbulkStartHelper;
-//                 } //Continuation of existing bulk
-//                 else if (bbulkPacketCountHelper > 4) {
-//                     bbulkPacketCount += 1;
-//                     bbulkSizeTotal += size;
-//                     bbulkDuration += packet.getTimeStamp() - blastBulkTS;
-//                 }
-//                 blastBulkTS = packet.getTimeStamp();
-//             }
-//         }
-// 	}
+        if (this.bwdBulkStartHelper == 0) {
+            this.bwdBulkStartHelper = packet.getTimeStamp();
+            this.bwdBulkPacketCountHelper = 1;
+            this.bwdBulkSizeHelper = size;
+            this.bwdLastBulkTime = packet.getTimeStamp();
+        } //possible bulk
+        else {
+            // Too much idle time?
+            if (((packet.getTimeStamp() - this.bwdLastBulkTime) / (double) 1000000) > 1.0) {
+                this.bwdBulkStartHelper = packet.getTimeStamp();
+                this.bwdLastBulkTime = packet.getTimeStamp();
+                this.bwdBulkPacketCountHelper = 1;
+                this.bwdBulkSizeHelper = size;
+            }// Add to bulk
+            else {
+                this.bwdBulkPacketCountHelper += 1;
+                this.bwdBulkSizeHelper += size;
+                //New bulk
+                if (this.bwdBulkPacketCountHelper == 4) {
+                    this.bwdBulkStateCount += 1;
+                    this.bwdBulkPacketCount += this.bwdBulkPacketCountHelper;
+                    this.bwdBulkSizeTotal += this.bwdBulkSizeHelper;
+                    this.bwdBulkDuration += packet.getTimeStamp() - this.bwdBulkStartHelper;
+                } //Continuation of existing bulk
+                else if (this.bwdBulkPacketCountHelper > 4) {
+                    this.bwdBulkPacketCount += 1;
+                    this.bwdBulkSizeTotal += size;
+                    this.bwdBulkDuration += packet.getTimeStamp() - this.bwdLastBulkTime;
+                }
+                this.bwdLastBulkTime = packet.getTimeStamp();
+            }
+        }
+	}
 
-// 	public long fbulkStateCount() {
-// 		return fbulkStateCount;
-// 	}
-
-// 	public long fbulkSizeTotal() {
-// 		return fbulkSizeTotal;
-// 	}
-
-// 	public long fbulkPacketCount() {
-// 		return fbulkPacketCount;
-// 	}
-
-// 	public long fbulkDuration() {
-// 		return fbulkDuration;
-// 	}
-// 	public double fbulkDurationInSecond() {
-// 		return fbulkDuration / (double) 1000000;
-// 	}
+	public Double calculateFwdBulkDurationInSecond() {
+		return this.fwdBulkDuration / (double) 1000000;
+	}
 
 //     //Client average bytes per bulk
 //     public double fAvgBytesPerBulk() {
@@ -707,26 +692,9 @@ public class Flow {
 //         return 0;
 //     }
 
-// 	//new features server
-// 	public long bbulkPacketCount() {
-// 		return bbulkPacketCount;
-// 	}
-
-// 	public long bbulkStateCount() {
-// 		return bbulkStateCount;
-// 	}
-
-// 	public long bbulkSizeTotal() {
-// 		return bbulkSizeTotal;
-// 	}
-
-// 	public long bbulkDuration() {
-// 		return bbulkDuration;
-// 	}
-
-// 	public double bbulkDurationInSecond() {
-// 		return bbulkDuration / (double) 1000000;
-// 	}
+	public Double calculateBwdBulkDurationInSecond() {
+		return this.bwdBulkDuration / (double) 1000000;
+	}
 
 //     //Server average bytes per bulk
 //     public double bAvgBytesPerBulk() {
@@ -812,14 +780,6 @@ public class Flow {
 // 		    return "UDP";
 // 		}
 // 		return "UNKNOWN";
-// 	}
-
-// 	public long getLastSeen() {
-// 		return flowLastSeen;
-// 	}
-
-// 	public void setLastSeen(long lastSeen) {
-// 		this.flowLastSeen = lastSeen;
 // 	}
 
 // 	public String getSrcIP() {
