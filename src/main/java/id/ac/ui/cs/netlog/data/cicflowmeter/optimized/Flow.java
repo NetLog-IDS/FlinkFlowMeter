@@ -32,14 +32,30 @@ public class Flow {
 
 // 	private HashMap<String, MutableInt> flagCounts;
 
+	// Flags
+	private Integer fwdFINCount;
+    private Integer bwdFINCount;
+
+	private Integer fwdSYNCount;
+	private Integer bwdSYNCount;
+
+	private Integer fwdRSTCount;
+    private Integer bwdRSTCount;
+
     private Integer fwdPSHCount;
     private Integer bwdPSHCount;
+
+	private Integer fwdACKCount;
+    private Integer bwdACKCount;
+
     private Integer fwdURGCount;
     private Integer bwdURGCount;
-    private Integer fwdRSTCount;
-    private Integer bwdRSTCount;
-    private Integer fwdFINCount;
-    private Integer bwdFINCount;
+
+	private Integer fwdCWRCount;
+    private Integer bwdCWRCount;
+
+	private Integer fwdECECount;
+    private Integer bwdECECount;
 
 // 	private long Act_data_pkt_forward;
 // 	private long Act_data_pkt_backward;
@@ -187,14 +203,24 @@ public class Flow {
 		this.endActiveTime = 0L;
 		this.src = null;
 		this.dst = null;
-        this.fwdPSHCount = 0;
-        this.bwdPSHCount = 0;
-        this.fwdURGCount = 0;
-        this.bwdURGCount = 0;
-        this.fwdFINCount = 0;
+
+		this.fwdFINCount = 0;
         this.bwdFINCount = 0;
+		this.fwdSYNCount = 0;
+        this.bwdSYNCount = 0;
 		this.fwdRSTCount = 0;
 		this.bwdRSTCount = 0;
+        this.fwdPSHCount = 0;
+        this.bwdPSHCount = 0;
+		this.fwdACKCount = 0;
+        this.bwdACKCount = 0;
+        this.fwdURGCount = 0;
+        this.bwdURGCount = 0;
+		this.fwdCWRCount = 0;
+        this.bwdCWRCount = 0;
+		this.fwdECECount = 0;
+        this.bwdECECount = 0;
+		
         this.fHeaderBytes = 0L;
         this.bHeaderBytes = 0L;
         // this.cumulativeConnectionDuration = 0L;
@@ -236,17 +262,29 @@ public class Flow {
             if (packet.getPayloadBytes() >= 1) {
                 // this.Act_data_pkt_forward++;
             }
+			if (packet.isFlagFIN()) {
+                this.fwdFINCount++;
+            }
+			if (packet.isFlagSYN()) {
+				this.fwdSYNCount++;
+			}
+			if (packet.isFlagRST()) {
+                this.fwdRSTCount++;
+            }
             if (packet.isFlagPSH()) {
                 this.fwdPSHCount++;
+            }
+			if (packet.isFlagACK()) {
+                this.fwdACKCount++;
             }
             if (packet.isFlagURG()) {
                 this.fwdURGCount++;
             }
-            if (packet.isFlagFIN()) {
-                this.fwdFINCount++;
+			if (packet.isFlagCWR()) {
+                this.fwdCWRCount++;
             }
-            if (packet.isFlagRST()) {
-                this.fwdRSTCount++;
+			if (packet.isFlagECE()) {
+                this.fwdECECount++;
             }
 		} else {
 			// this.min_seg_size_backward = packet.getHeaderBytes();
@@ -259,17 +297,29 @@ public class Flow {
             if (packet.getPayloadBytes() >= 1) {
                 // this.Act_data_pkt_backward++;
             }
+			if (packet.isFlagFIN()) {
+                this.bwdFINCount++;
+            }
+			if (packet.isFlagSYN()) {
+                this.bwdSYNCount++;
+            }
+			if (packet.isFlagRST()) {
+                this.bwdRSTCount++;
+            }
             if (packet.isFlagPSH()) {
                 this.bwdPSHCount++;
+            }
+			if (packet.isFlagACK()) {
+                this.bwdACKCount++;
             }
             if (packet.isFlagURG()) {
                 this.bwdURGCount++;
             }
-            if (packet.isFlagFIN()) {
-                this.bwdFINCount++;
+			if (packet.isFlagCWR()) {
+                this.bwdCWRCount++;
             }
-            if (packet.isFlagRST()) {
-                this.bwdRSTCount++;
+			if (packet.isFlagECE()) {
+                this.bwdECECount++;
             }
 		}
 		this.protocol = packet.getProtocol();
@@ -325,18 +375,30 @@ public class Flow {
     				this.forwardIAT.add(currentTimestamp - this.forwardLastSeen);
     			this.forwardLastSeen = Math.max(this.forwardLastSeen, currentTimestamp);
 				// this.min_seg_size_forward = Math.min(packet.getHeaderBytes(), this.min_seg_size_forward);
-                if (packet.isFlagPSH()) {
-                    this.fwdPSHCount++;
-                }
-                if (packet.isFlagURG()) {
-                    this.fwdURGCount++;
-                }
-                if (packet.isFlagFIN()) {
-                    this.fwdFINCount++;
-                }
-                if (packet.isFlagRST()) {
-                    this.fwdRSTCount++;
-                }
+				if (packet.isFlagFIN()) {
+					this.fwdFINCount++;
+				}
+				if (packet.isFlagSYN()) {
+					this.fwdSYNCount++;
+				}
+				if (packet.isFlagRST()) {
+					this.fwdRSTCount++;
+				}
+				if (packet.isFlagPSH()) {
+					this.fwdPSHCount++;
+				}
+				if (packet.isFlagACK()) {
+					this.fwdACKCount++;
+				}
+				if (packet.isFlagURG()) {
+					this.fwdURGCount++;
+				}
+				if (packet.isFlagCWR()) {
+					this.fwdCWRCount++;
+				}
+				if (packet.isFlagECE()) {
+					this.fwdECECount++;
+				}
     		}else{
 				if (packet.getPayloadBytes() >= 1) {
                     // this.Act_data_pkt_backward++;
@@ -355,18 +417,30 @@ public class Flow {
     				this.backwardIAT.add(currentTimestamp - this.backwardLastSeen);
     			this.backwardLastSeen = Math.max(backwardLastSeen, currentTimestamp);
 				// this.min_seg_size_backward = Math.min(packet.getHeaderBytes(), this.min_seg_size_backward);
-                if (packet.isFlagPSH()) {
-                    this.bwdPSHCount++;
-                }
-                if (packet.isFlagURG()) {
-                    this.bwdURGCount++;
-                }
-                if (packet.isFlagFIN()) {
-                    this.bwdFINCount++;
-                }
-                if (packet.isFlagRST()) {
-                    this.bwdRSTCount++;
-                }
+				if (packet.isFlagFIN()) {
+					this.bwdFINCount++;
+				}
+				if (packet.isFlagSYN()) {
+					this.bwdSYNCount++;
+				}
+				if (packet.isFlagRST()) {
+					this.bwdRSTCount++;
+				}
+				if (packet.isFlagPSH()) {
+					this.bwdPSHCount++;
+				}
+				if (packet.isFlagACK()) {
+					this.bwdACKCount++;
+				}
+				if (packet.isFlagURG()) {
+					this.bwdURGCount++;
+				}
+				if (packet.isFlagCWR()) {
+					this.bwdCWRCount++;
+				}
+				if (packet.isFlagECE()) {
+					this.bwdECECount++;
+				}
     		}
     	} else {
 			if(packet.getPayloadBytes() >= 1) {
