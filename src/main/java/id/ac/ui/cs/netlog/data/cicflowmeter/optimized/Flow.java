@@ -82,9 +82,10 @@ public class Flow {
     private long forwardLastSeen;
     private long backwardLastSeen;
     private long activityTimeout;
-// 	private long sfLastPacketTS = -1;
-//     private int sfCount = 0;
-//     private long sfAcHelper = -1;
+
+	private long subflowLastPacketTime = -1;
+    private int subflowCount = 0;
+    // private long sfAcHelper = -1;
 	
 // 	private long fbulkDuration = 0;
 // 	private long fbulkPacketCount = 0;
@@ -243,7 +244,7 @@ public class Flow {
         this.sniffStartTime = packet.getSniffTime();
 		this.flowLastSeen = packet.getTimeStamp();
 		this.startActiveTime = packet.getTimeStamp();
-		// detectUpdateSubflows(packet);
+		detectUpdateSubflows(packet);
 		this.flowLengthStats.add(packet.getPayloadBytes());
 	
 		if (Arrays.equals(this.src, packet.getSrc())) {
@@ -351,7 +352,7 @@ public class Flow {
     
     public void addPacket(PacketInfo packet) {
 		// updateFlowBulk(packet);
-		// detectUpdateSubflows(packet);
+		detectUpdateSubflows(packet);
 		// checkFlags(packet);
 		// handleTcpRetransmissionFields(packet);
     	long currentTimestamp = packet.getTimeStamp();
@@ -537,38 +538,41 @@ public class Flow {
 // 		}
 // 	}
 
-//     public double getSflow_fbytes() {
-//         if (sfCount <= 0) return 0;
-//         return (double) this.forwardBytes / sfCount;
-//     }
+	public Double calculateSubflowFwdBytes() {
+		if (this.subflowCount <= 0) return 0.0;
+        return (double) this.forwardBytes / this.subflowCount;
+	}
 
-//     public double getSflow_fpackets() {
-//         if (sfCount <= 0) return 0;
-//         return (double) this.forward.size() / sfCount;
-//     }
+    public Double calculateSubflowFwdPackets() {
+        if (this.subflowCount <= 0) return 0.0;
+		return (double) this.fwdPktStats.calculateCount() / this.subflowCount;
+        // return (double) this.forward.size() / sfCount;
+    }
 
-//     public double getSflow_bbytes() {
-//         if (sfCount <= 0) return 0;
-//         return (double) this.backwardBytes / sfCount;
-//     }
+    public Double calculateSubflowBwdBytes() {
+        if (this.subflowCount <= 0) return 0.0;
+		return (double) this.backwardBytes / this.subflowCount;
+        // return (double) this.backwardBytes / sfCount;
+    }
 
-//     public double getSflow_bpackets() {
-//         if (sfCount <= 0) return 0;
-//         return (double) this.backward.size() / sfCount;
-//     }
+    public Double calculateSubflowBwdPackets() {
+        if (this.subflowCount <= 0) return 0.0;
+		return (double) this.bwdPktStats.calculateCount() / this.subflowCount;
+        // return (double) this.backward.size() / sfCount;
+    }
 
-// 	void detectUpdateSubflows(PacketInfo packet) {
-//         if (sfLastPacketTS == -1) {
-//             sfLastPacketTS = packet.getTimeStamp();
-//             sfAcHelper = packet.getTimeStamp();
-//         }
-//         if(((packet.getTimeStamp() - sfLastPacketTS)/(double)1000000)  > 1.0){
-//             sfCount++;
-//             updateActiveIdleTime(packet.getTimeStamp(), this.activityTimeout);
-//             sfAcHelper = packet.getTimeStamp();
-//         }
-//         sfLastPacketTS = packet.getTimeStamp();
-// 	}
+	void detectUpdateSubflows(PacketInfo packet) {
+        if (this.subflowLastPacketTime == -1) {
+            this.subflowLastPacketTime = packet.getTimeStamp();
+            // sfAcHelper = packet.getTimeStamp();
+        }
+        if(((packet.getTimeStamp() - this.subflowLastPacketTime) / (double) 1000000)  > 1.0){
+            this.subflowCount++;
+            updateActiveIdleTime(packet.getTimeStamp(), this.activityTimeout);
+            // sfAcHelper = packet.getTimeStamp();
+        }
+        this.subflowLastPacketTime = packet.getTimeStamp();
+	}
 
 // 	public void updateFlowBulk(PacketInfo packet) {
 // 		if (Arrays.equals(this.src, packet.getSrc())) {
