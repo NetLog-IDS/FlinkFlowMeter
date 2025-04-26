@@ -20,9 +20,6 @@ public class Flow {
     private Statistics fwdPktStats = null;
     private Statistics bwdPktStats = null;
 
-// 	private List<PacketInfo> forward = null;
-// 	private	List<PacketInfo> backward = null;
-
 	private Long forwardBytes;
 	private Long backwardBytes;
 	private Long fHeaderBytes;
@@ -57,12 +54,12 @@ public class Flow {
 	private Integer fwdECECount;
     private Integer bwdECECount;
 
-// 	private long Act_data_pkt_forward;
-// 	private long Act_data_pkt_backward;
-// 	private long min_seg_size_forward;
-// 	private long min_seg_size_backward;
-// 	private int Init_Win_bytes_forward = 0;
-// 	private int Init_Win_bytes_backward = 0;
+	private Long fwdActDataPkt;
+	private Long bwdActDataPkt;
+	private Long fwdMinSegSize;
+	private Long bwdMinSegSize;
+	private Integer fwdInitWinBytes = 0;
+	private Integer bwdInitWinBytes = 0;
 
 	private	byte[] src;
     private byte[] dst;
@@ -185,8 +182,6 @@ public class Flow {
 	}
 	
 	public void initParameters() {
-		// this.forward = new ArrayList<PacketInfo>();
-		// this.backward = new ArrayList<PacketInfo>();
 		this.flowIAT = new Statistics();
 		this.forwardIAT = new Statistics();
 		this.backwardIAT = new Statistics();
@@ -252,15 +247,15 @@ public class Flow {
 		this.flowLengthStats.add(packet.getPayloadBytes());
 	
 		if (Arrays.equals(this.src, packet.getSrc())) {
-			// this.min_seg_size_forward = packet.getHeaderBytes();
-			// Init_Win_bytes_forward = packet.getTCPWindow();
+			this.fwdMinSegSize = packet.getHeaderBytes();
+			this.fwdInitWinBytes = packet.getTCPWindow();
 			this.fwdPktStats.add(packet.getPayloadBytes());
 			this.fHeaderBytes = packet.getHeaderBytes();
 			this.forwardLastSeen = packet.getTimeStamp();
 			this.forwardBytes += packet.getPayloadBytes();
 			// this.forward.add(packet);
             if (packet.getPayloadBytes() >= 1) {
-                // this.Act_data_pkt_forward++;
+				this.fwdActDataPkt++;
             }
 			if (packet.isFlagFIN()) {
                 this.fwdFINCount++;
@@ -287,15 +282,15 @@ public class Flow {
                 this.fwdECECount++;
             }
 		} else {
-			// this.min_seg_size_backward = packet.getHeaderBytes();
-			// Init_Win_bytes_backward = packet.getTCPWindow();
+			this.bwdMinSegSize = packet.getHeaderBytes();
+			this.bwdInitWinBytes = packet.getTCPWindow();
 			this.bwdPktStats.add(packet.getPayloadBytes());
 			this.bHeaderBytes = packet.getHeaderBytes();
 			this.backwardLastSeen = packet.getTimeStamp();
 			this.backwardBytes += packet.getPayloadBytes();
 			// this.backward.add(packet);
             if (packet.getPayloadBytes() >= 1) {
-                // this.Act_data_pkt_backward++;
+				this.bwdActDataPkt++;
             }
 			if (packet.isFlagFIN()) {
                 this.bwdFINCount++;
@@ -365,7 +360,7 @@ public class Flow {
 
     		if(Arrays.equals(this.src, packet.getSrc())){
 				if(packet.getPayloadBytes() >= 1){
-					// this.Act_data_pkt_forward++;
+					this.fwdActDataPkt++;
 				}
 				this.fwdPktStats.add(packet.getPayloadBytes());
 				this.fHeaderBytes += packet.getHeaderBytes();
@@ -374,7 +369,7 @@ public class Flow {
     			if (this.fwdPktStats.calculateCount() > 1)
     				this.forwardIAT.add(currentTimestamp - this.forwardLastSeen);
     			this.forwardLastSeen = Math.max(this.forwardLastSeen, currentTimestamp);
-				// this.min_seg_size_forward = Math.min(packet.getHeaderBytes(), this.min_seg_size_forward);
+				this.fwdMinSegSize = Math.min(packet.getHeaderBytes(), this.fwdMinSegSize);
 				if (packet.isFlagFIN()) {
 					this.fwdFINCount++;
 				}
@@ -401,22 +396,22 @@ public class Flow {
 				}
     		}else{
 				if (packet.getPayloadBytes() >= 1) {
-                    // this.Act_data_pkt_backward++;
+					this.bwdActDataPkt++;
                 }
 				this.bwdPktStats.add(packet.getPayloadBytes());
-				// set Init_win_bytes_backward if not been set. The set logic isn't 100%
+				// set Init_win_bytes_backward (now bwdInitWinBytes) if not been set. The set logic isn't 100%
                 // accurate, since it technically takes the first non-zero value, but should
                 // be good enough for most cases.
-                // if (Init_Win_bytes_backward == 0) {
-                //     Init_Win_bytes_backward = packet.getTCPWindow();
-                // }
+                if (this.bwdInitWinBytes == 0) {
+                    this.bwdInitWinBytes = packet.getTCPWindow();
+                }
 				this.bHeaderBytes += packet.getHeaderBytes();
     			// this.backward.add(packet);
     			this.backwardBytes += packet.getPayloadBytes();
     			if (this.bwdPktStats.calculateCount() > 1)
     				this.backwardIAT.add(currentTimestamp - this.backwardLastSeen);
     			this.backwardLastSeen = Math.max(backwardLastSeen, currentTimestamp);
-				// this.min_seg_size_backward = Math.min(packet.getHeaderBytes(), this.min_seg_size_backward);
+				this.bwdMinSegSize = Math.min(packet.getHeaderBytes(), this.bwdMinSegSize);
 				if (packet.isFlagFIN()) {
 					this.bwdFINCount++;
 				}
@@ -444,7 +439,7 @@ public class Flow {
     		}
     	} else {
 			if(packet.getPayloadBytes() >= 1) {
-				// this.Act_data_pkt_forward++;
+				this.fwdActDataPkt++;
 			}
 			this.fwdPktStats.add(packet.getPayloadBytes());
 			this.flowLengthStats.add(packet.getPayloadBytes());
@@ -453,7 +448,7 @@ public class Flow {
     		this.forwardBytes += packet.getPayloadBytes();
     		this.forwardIAT.add(currentTimestamp - this.forwardLastSeen);
     		this.forwardLastSeen = Math.max(this.forwardLastSeen, currentTimestamp);
-			// this.min_seg_size_forward = Math.min(packet.getHeaderBytes(), this.min_seg_size_forward);
+			this.fwdMinSegSize = Math.min(packet.getHeaderBytes(), this.fwdMinSegSize);
     	}
 
     	this.flowIAT.add(packet.getTimeStamp() - this.flowLastSeen);
@@ -995,31 +990,7 @@ public class Flow {
 //     public int getFlagCount(String key) {
 //         return flagCounts.get(key).getValue();
 //     }
-	
-// 	public int getInit_Win_bytes_forward() {
-// 		return Init_Win_bytes_forward;
-// 	}
-	
-// 	public int getInit_Win_bytes_backward() {
-// 		return Init_Win_bytes_backward;
-// 	}
-	
-// 	public long getAct_data_pkt_forward() {
-// 		return Act_data_pkt_forward;
-// 	}
 
-// 	public long getAct_data_pkt_backward() {
-//         return Act_data_pkt_backward;
-//     }
-	
-// 	public long getmin_seg_size_forward() {
-// 		return min_seg_size_forward;
-// 	}
-
-// 	public long getmin_seg_size_backward() {
-//         return min_seg_size_backward;
-//     }
-	
 //     public double getActiveMean() {
 //         return (flowActive.getN() > 0) ? flowActive.getMean() : 0;
 //     }
