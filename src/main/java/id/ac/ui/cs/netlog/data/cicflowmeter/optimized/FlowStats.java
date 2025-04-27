@@ -296,9 +296,9 @@ public class FlowStats {
         // this.icmpCode = flow.getIcmpCode();
         // this.icmpType = flow.getIcmpType();
 
-        // this.fwdTCPRetransCount = flow.getFwdTcpRetransCnt();
-        // this.bwdTCPRetransCount = flow.getBwdTcpRetransCnt();
-        // this.totalTCPRetransCount = this.fwdTCPRetransCount + this.bwdTCPRetransCount;
+        this.fwdTCPRetransCount = flow.getFwdTcpRetransCnt();
+        this.bwdTCPRetransCount = flow.getBwdTcpRetransCnt();
+        this.totalTCPRetransCount = this.fwdTCPRetransCount + this.bwdTCPRetransCount;
 
         // this.cummConnectionTime = flow.getCumulativeConnectionDuration();
     }

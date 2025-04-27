@@ -1,16 +1,16 @@
 package id.ac.ui.cs.netlog.operators;
 
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.flink.api.common.state.MapState;
+import org.apache.flink.api.common.state.MapStateDescriptor;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.TimeDomain;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
 
@@ -19,7 +19,6 @@ import id.ac.ui.cs.netlog.data.cicflowmeter.PacketInfo;
 import id.ac.ui.cs.netlog.data.cicflowmeter.ProtocolEnum;
 import id.ac.ui.cs.netlog.data.cicflowmeter.TCPFlowState;
 import id.ac.ui.cs.netlog.data.cicflowmeter.TCPRetransmission;
-import id.ac.ui.cs.netlog.data.cicflowmeter.TimerParams;
 import id.ac.ui.cs.netlog.utils.TimeUtils;
 
 public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow> {
@@ -48,6 +47,7 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
 	private static final List<ProtocolEnum> TCP_UDP_LIST_FILTER = Arrays.asList(ProtocolEnum.TCP, ProtocolEnum.UDP);
 
 	private transient ValueState<Flow> flowState;
+	private transient MapState<Integer, Boolean> tcpSeenState;
 
 	private boolean bidirectional;
 	
@@ -61,7 +61,13 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
 			"flowState",
 			TypeInformation.of(new TypeHint<Flow>() {})
 		);
+		MapStateDescriptor<Integer, Boolean> tcpSeenDescriptor = new MapStateDescriptor<>(
+			"tcpSeenState",
+			TypeInformation.of(new TypeHint<Integer>() {}),
+			TypeInformation.of(new TypeHint<Boolean>() {})
+		);
 		flowState = getRuntimeContext().getState(flowDescriptor);
+		tcpSeenState = getRuntimeContext().getMapState(tcpSeenDescriptor);
 	}
 
 	@Override
@@ -120,6 +126,8 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
                                                                                                           // termination
                         || createNewUdpFlow // udp packet is not part of current "dialogue"
                 ) {
+					tcpSeenState.clear();
+
                     if (packet.isFlagSYN() && packet.isFlagACK()) {
                         // create new flow, switch direction - we assume the PCAP file had a mistake
                         // where SYN-ACK arrived before SYN packet
@@ -133,6 +141,7 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
 							packet.getSrcPort(),
 							ACTIVITY_TIMEOUT
 						);
+						updateRetransmission(newFlow, packet);
 						flowState.update(newFlow);
                     } else {
                         // Packet only has SYN, no ACK
@@ -146,6 +155,7 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
 							packet.getDstPort(),
 							ACTIVITY_TIMEOUT
 						);
+						updateRetransmission(newFlow, packet);
 						flowState.update(newFlow);
                     }
                 } else {
@@ -154,8 +164,9 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
                     // maintain the same source and destination information as the previous flow
                     // (since they're part of the
                     // same TCP connection or UDP "dialogue".
-					// Set<TCPRetransmission> tcpPacketsSeenCopy = new HashSet<>(flow.getTcpPacketsSeen()); 
-                    Set<TCPRetransmission> tcpPacketsSeenCopy = null; // TODO
+
+					// tcpSeenState aren't cleared here.
+
                     newFlow = new Flow(
 						currentInstanceTimestamp,
 						bidirectional,
@@ -164,9 +175,9 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
 						flow.getDst(),
                         flow.getSrcPort(),
                         flow.getDstPort(),
-						ACTIVITY_TIMEOUT,
-						tcpPacketsSeenCopy
+						ACTIVITY_TIMEOUT
 					);
+					updateRetransmission(newFlow, packet);
 
                     // currDuration = flow.getCumulativeConnectionDuration();
                     // get the gap between the last flow and the start of this flow
@@ -185,6 +196,7 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
                 // 3.- we eliminate the flow from the current flow list
 
                 flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
+				updateRetransmission(flow, packet);
                 flow.addPacket(packet);
 
                 // First FIN packet
@@ -200,12 +212,14 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
 				flowState.update(flow);         
     		} else if (packet.isFlagRST()) {
 				flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
+				updateRetransmission(flow, packet);
                 flow.addPacket(packet);
 				flow.setTcpFlowState(TCPFlowState.READY_FOR_TERMINATION);
 				out.collect(flow);
                 flowState.update(flow);
 			} else if (packet.isFlagACK()) {
 				flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
+				updateRetransmission(flow, packet);
                 flow.addPacket(packet);
 
                 // Final ack packet for TCP flow termination
@@ -216,10 +230,13 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
                 flowState.update(flow);
 			} else { // default
     			flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
+				updateRetransmission(flow, packet);
                 flow.addPacket(packet);
                 flowState.update(flow);
     		}
     	} else {
+			tcpSeenState.clear();
+
 			Flow newFlow = null;
 			if (packet.isFlagSYN() && packet.isFlagACK()) {
 				// Backward
@@ -233,6 +250,7 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
 					packet.getSrcPort(),
 					ACTIVITY_TIMEOUT
 				);
+				updateRetransmission(newFlow, packet);
 				flowState.update(newFlow);
             } else {
 				// Forward
@@ -242,11 +260,31 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
 					packet,
 					ACTIVITY_TIMEOUT
 				);
+				updateRetransmission(newFlow, packet);
 				flowState.update(newFlow);
             }
 			triggerTimer(newFlow, ctx);
     	}
     }
+
+	private void updateRetransmission(Flow flow, PacketInfo packet) throws Exception {
+		if (packet.getProtocol() != ProtocolEnum.TCP) {
+			return;
+		}
+
+		Integer hashCode = packet.getTcpRetransmission().hashCode();
+		// If the element was successfully added to the hashset, then it has not been seen
+		// before, and is not a retransmission.
+		if (!tcpSeenState.contains(hashCode)) {
+			tcpSeenState.put(hashCode, true);
+		} else {
+			if (Arrays.equals(flow.getSrc(), packet.getSrc())) {
+				flow.setFwdTcpRetransCnt(flow.getFwdTcpRetransCnt() + 1);
+			} else {
+				flow.setBwdTcpRetransCnt(flow.getBwdTcpRetransCnt() + 1);
+			}
+		}
+	}
 
 	private void triggerTimer(Flow flow, KeyedProcessFunction<String, PacketInfo, Flow>.Context ctx) throws Exception {
 		// long triggerTime = ctx.timerService().currentWatermark() + (FLOW_TIMEOUT / 1000L) + 5; // 5 milliseconds grace
@@ -264,6 +302,8 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
 		if (flow.getTcpFlowState() != TCPFlowState.READY_FOR_TERMINATION) {
 			out.collect(flow);
 		}
+
+		tcpSeenState.clear();
 		flowState.update(null);
     }
 }

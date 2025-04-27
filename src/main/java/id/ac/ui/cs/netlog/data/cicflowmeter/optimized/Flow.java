@@ -1,13 +1,11 @@
 package id.ac.ui.cs.netlog.data.cicflowmeter.optimized;
 
 import java.util.Arrays;
-import java.util.Set;
 import java.util.UUID;
 
 import id.ac.ui.cs.netlog.data.cicflowmeter.PacketInfo;
 import id.ac.ui.cs.netlog.data.cicflowmeter.ProtocolEnum;
 import id.ac.ui.cs.netlog.data.cicflowmeter.TCPFlowState;
-import id.ac.ui.cs.netlog.data.cicflowmeter.TCPRetransmission;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -97,8 +95,8 @@ public class Flow {
 	private long bwdBulkSizeHelper = 0;
 	private long bwdLastBulkTime = 0;
 
-// 	private int fwdTcpRetransCnt = 0;
-//     private int bwdTcpRetransCnt = 0;
+	private int fwdTcpRetransCnt = 0;
+    private int bwdTcpRetransCnt = 0;
 //     private Set<TCPRetransmission> tcpPacketsSeen;
 
 //     // The flow timeout is dependent on the user configuration and is unable to capture proper
@@ -130,28 +128,6 @@ public class Flow {
 		this.dst = flowDst;
 		this.srcPort = flowSrcPort;
 		this.dstPort = flowDstPort;
-		this.firstPacket(packet);
-	}
-
-	public Flow(
-			long processStartTime,
-			boolean bidirectional,
-			PacketInfo packet,
-			byte[] flowSrc,
-			byte[] flowDst,
-			int flowSrcPort,
-			int flowDstPort,
-			long activityTimeout,
-			Set<TCPRetransmission> tcpPacketsSeen) {
-		this.processStartTime = processStartTime;
-		this.activityTimeout = activityTimeout;
-		this.initParameters();
-		this.bidirectional = bidirectional;
-		this.src = flowSrc;
-		this.dst = flowDst;
-		this.srcPort = flowSrcPort;
-		this.dstPort = flowDstPort;
-		// this.tcpPacketsSeen = tcpPacketsSeen; // TODO: handle outside
 		this.firstPacket(packet);
 	}
 
