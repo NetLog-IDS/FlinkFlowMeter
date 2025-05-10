@@ -14,6 +14,7 @@ import lombok.NoArgsConstructor;
 public class Flow {
 	private Long processStartTime;
     private Long sniffStartTime;
+	private Long timerDeadline;
 
     private Statistics fwdPktStats = null;
     private Statistics bwdPktStats = null;

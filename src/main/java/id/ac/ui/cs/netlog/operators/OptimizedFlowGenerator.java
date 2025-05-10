@@ -95,6 +95,7 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
 
 				if (flow.getTcpFlowState() != TCPFlowState.READY_FOR_TERMINATION) {
 					out.collect(flow);
+					untriggerTimer(flow, ctx);
 				}
 
 				// Create a new UDP flow if activity time difference between the current UDP
@@ -140,7 +141,6 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
 							ACTIVITY_TIMEOUT
 						);
 						updateRetransmission(newFlow, packet);
-						flowState.update(newFlow);
                     } else {
                         // Packet only has SYN, no ACK
 						newFlow = new Flow(
@@ -154,7 +154,6 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
 							ACTIVITY_TIMEOUT
 						);
 						updateRetransmission(newFlow, packet);
-						flowState.update(newFlow);
                     }
                 } else {
                     // Otherwise, the previous flow was likely terminated because of a timeout, and
@@ -181,9 +180,9 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
                     // get the gap between the last flow and the start of this flow
                     // currDuration += (currentTimestamp - flow.getLastSeen());
                     // newFlow.setCumulativeConnectionDuration(currDuration);
-					flowState.update(newFlow);
                 }
 				triggerTimer(newFlow, ctx);
+				flowState.update(newFlow);
 			} else if (flow.getTcpFlowState() == TCPFlowState.READY_FOR_TERMINATION) {
 				// Ignore packets after termination and before SYN
 				return;
@@ -214,6 +213,7 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
                 flow.addPacket(packet);
 				flow.setTcpFlowState(TCPFlowState.READY_FOR_TERMINATION);
 				out.collect(flow);
+				untriggerTimer(flow, ctx);
                 flowState.update(flow);
 			} else if (packet.isFlagACK()) {
 				flow.updateActiveIdleTime(currentTimestamp, ACTIVITY_TIMEOUT);
@@ -224,6 +224,7 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
                 if (flow.getTcpFlowState() == TCPFlowState.SECOND_FIN_FLAG_RECEIVED) {
                     flow.setTcpFlowState(TCPFlowState.READY_FOR_TERMINATION);
 					out.collect(flow);
+					untriggerTimer(flow, ctx);
                 }
                 flowState.update(flow);
 			} else { // default
@@ -249,7 +250,6 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
 					ACTIVITY_TIMEOUT
 				);
 				updateRetransmission(newFlow, packet);
-				flowState.update(newFlow);
             } else {
 				// Forward
 				newFlow = new Flow(
@@ -259,9 +259,9 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
 					ACTIVITY_TIMEOUT
 				);
 				updateRetransmission(newFlow, packet);
-				flowState.update(newFlow);
             }
 			triggerTimer(newFlow, ctx);
+			flowState.update(newFlow);
     	}
     }
 
@@ -286,22 +286,46 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
 
 	private void triggerTimer(Flow flow, KeyedProcessFunction<String, PacketInfo, Flow>.Context ctx) throws Exception {
 		// long triggerTime = ctx.timerService().currentWatermark() + (FLOW_TIMEOUT / 1000L) + 5; // 5 milliseconds grace
-		long triggerTime = (flow.getFlowStartTime() / 1000L) + (FLOW_TIMEOUT / 1000L) + 5; // 5 milliseconds grace
 		// System.out.println("[TRIGGERINGZ] " + flow.getFlowStartTime() + " " + ctx.timerService().currentWatermark());
-		ctx.timerService().registerEventTimeTimer(triggerTime);
+
+		// long triggerTime = (flow.getFlowStartTime() / 1000L) + (FLOW_TIMEOUT / 1000L) + 5; // 5 milliseconds grace
+		// ctx.timerService().registerEventTimeTimer(triggerTime);
+
+		long triggerTime = ctx.timerService().currentProcessingTime() + (FLOW_TIMEOUT / 1000L) + 100; // 100 milliseconds grace
+		ctx.timerService().registerProcessingTimeTimer(triggerTime);
+		flow.setTimerDeadline(triggerTime);
 	}
 
-    @Override
+	private void untriggerTimer(Flow flow, KeyedProcessFunction<String, PacketInfo, Flow>.Context ctx) throws Exception {
+		ctx.timerService().deleteProcessingTimeTimer(flow.getTimerDeadline());
+	}
+
+	@Override
     public void onTimer(long timestamp, OnTimerContext ctx, Collector<Flow> out) throws Exception {
 		Flow flow = flowState.value();
 		if (flow == null) return;
-		if ((timestamp - (flow.getFlowStartTime() / 1000L)) <= (FLOW_TIMEOUT / 1000L)) return;
 
 		if (flow.getTcpFlowState() != TCPFlowState.READY_FOR_TERMINATION) {
 			out.collect(flow);
+			untriggerTimer(flow, ctx);
 		}
 
 		tcpSeenState.clear();
 		flowState.update(null);
     }
+
+	// Implementation for Event Timer:
+    // @Override
+    // public void onTimer(long timestamp, OnTimerContext ctx, Collector<Flow> out) throws Exception {
+	// 	Flow flow = flowState.value();
+	// 	if (flow == null) return;
+	// 	if ((timestamp - (flow.getFlowStartTime() / 1000L)) <= (FLOW_TIMEOUT / 1000L)) return;
+
+	// 	if (flow.getTcpFlowState() != TCPFlowState.READY_FOR_TERMINATION) {
+	// 		out.collect(flow);
+	// 	}
+
+	// 	tcpSeenState.clear();
+	// 	flowState.update(null);
+    // }
 }
