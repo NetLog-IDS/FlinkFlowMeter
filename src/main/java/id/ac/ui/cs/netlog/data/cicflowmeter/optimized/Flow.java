@@ -15,6 +15,8 @@ public class Flow {
 	private Long processStartTime;
     private Long sniffStartTime;
 	private Long timerDeadline;
+	private Long clearanceDeadline;
+	private Boolean submitted = false;
 
     private Statistics fwdPktStats = null;
     private Statistics bwdPktStats = null;
