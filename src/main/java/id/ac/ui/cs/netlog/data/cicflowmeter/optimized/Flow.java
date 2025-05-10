@@ -25,8 +25,6 @@ public class Flow {
 	
 	private boolean bidirectional;
 
-// 	private HashMap<String, MutableInt> flagCounts;
-
 	// Flags
 	private Integer fwdFINCount;
     private Integer bwdFINCount;
@@ -76,7 +74,6 @@ public class Flow {
 
 	private long subflowLastPacketTime = -1;
     private int subflowCount = 0;
-    // private long sfAcHelper = -1;
 	
 	private long fwdBulkDuration = 0;
 	private long fwdBulkPacketCount = 0;
@@ -97,19 +94,9 @@ public class Flow {
 
 	private int fwdTcpRetransCnt = 0;
     private int bwdTcpRetransCnt = 0;
-//     private Set<TCPRetransmission> tcpPacketsSeen;
-
-//     // The flow timeout is dependent on the user configuration and is unable to capture proper
-//     // context in extended TCP connections. This field will help identify whether a flow is
-//     // part of an extended TCP connection.
-//     private long cumulativeConnectionDuration;
 
     //To keep track of TCP connection teardown, or an RST packet in one direction.
     private TCPFlowState tcpFlowState;
-
-//     // ICMP fields
-//     private int icmpCode = -1;
-//     private int icmpType = -1;
 
 	public Flow(
 			long processStartTime,
@@ -160,8 +147,6 @@ public class Flow {
 		this.flowLengthStats = new Statistics();
         this.fwdPktStats = new Statistics();
 		this.bwdPktStats =  new Statistics();
-		// this.flagCounts = new HashMap<String, MutableInt>();
-		// initFlags();
 		this.forwardBytes = 0L;
 		this.backwardBytes = 0L;	
 		this.startActiveTime = 0L;
@@ -188,9 +173,7 @@ public class Flow {
 		
         this.fwdHeaderBytes = 0L;
         this.bwdHeaderBytes = 0L;
-        // this.cumulativeConnectionDuration = 0L;
         this.tcpFlowState = null;
-        // this.tcpPacketsSeen = new HashSet<TCPRetransmission>();
 	}
 	
 	
@@ -206,8 +189,6 @@ public class Flow {
 
 		updateFlowBulk(packet);
 		
-		// checkFlags(packet);
-
 		this.endActiveTime = packet.getTimeStamp();
 		this.flowStartTime = packet.getTimeStamp();
         this.sniffStartTime = packet.getSniffTime();
@@ -223,7 +204,6 @@ public class Flow {
 			this.fwdHeaderBytes = packet.getHeaderBytes();
 			this.forwardLastSeen = packet.getTimeStamp();
 			this.forwardBytes += packet.getPayloadBytes();
-			// this.forward.add(packet);
             if (packet.getPayloadBytes() >= 1) {
 				this.fwdActDataPkt++;
             }
@@ -258,7 +238,6 @@ public class Flow {
 			this.bwdHeaderBytes = packet.getHeaderBytes();
 			this.backwardLastSeen = packet.getTimeStamp();
 			this.backwardBytes += packet.getPayloadBytes();
-			// this.backward.add(packet);
             if (packet.getPayloadBytes() >= 1) {
 				this.bwdActDataPkt++;
             }
@@ -288,42 +267,12 @@ public class Flow {
             }
 		}
 		this.protocol = packet.getProtocol();
-        // this.icmpCode = packet.getIcmpCode();
-        // this.icmpType = packet.getIcmpType();
         this.flowId = UUID.randomUUID().toString();
-        // handleTcpRetransmissionFields(packet);	
 	}
-
-// 	/***
-//      * The retransmission mechanism is crude, and relies on the fact that the fields in the TcpRetransmissionDTO
-//      * class are unique. This is not a perfect solution, but it should be good enough for detection of very obvious
-//      * TCP retransmissions.
-//      * @param packet
-//      */
-//     private void handleTcpRetransmissionFields(PacketInfo packet) {
-//         if (this.protocol == ProtocolEnum.TCP) {
-//             TCPRetransmission tcpRetransmission = packet.getTcpRetransmission();
-//             // If the element was successfully added to the hashset, then it has not been seen
-//             // before, and is not a retransmission.
-//             boolean isRetransmission = !(this.tcpPacketsSeen.add(tcpRetransmission));
-//             if (isRetransmission) {
-//                 // check if the packet is a forward packet
-//                 if (Arrays.equals(this.src, packet.getSrc())) {
-//                     // increment the forward retransmission count
-//                     this.fwdTcpRetransCnt++;
-//                 } else {
-//                     // increment the backward retransmission count
-//                     this.bwdTcpRetransCnt++;
-//                 }
-//             }
-//         }
-//     }
     
     public void addPacket(PacketInfo packet) {
 		updateFlowBulk(packet);
 		detectUpdateSubflows(packet);
-		// checkFlags(packet);
-		// handleTcpRetransmissionFields(packet);
     	long currentTimestamp = packet.getTimeStamp();
     	if (this.bidirectional) {
 			this.flowLengthStats.add(packet.getPayloadBytes());
@@ -334,7 +283,6 @@ public class Flow {
 				}
 				this.fwdPktStats.add(packet.getPayloadBytes());
 				this.fwdHeaderBytes += packet.getHeaderBytes();
-    			// this.forward.add(packet);   
     			this.forwardBytes += packet.getPayloadBytes();
     			if (this.fwdPktStats.calculateCount() > 1)
     				this.forwardIAT.add(currentTimestamp - this.forwardLastSeen);
@@ -376,7 +324,6 @@ public class Flow {
                     this.bwdInitWinBytes = packet.getTCPWindow();
                 }
 				this.bwdHeaderBytes += packet.getHeaderBytes();
-    			// this.backward.add(packet);
     			this.backwardBytes += packet.getPayloadBytes();
     			if (this.bwdPktStats.calculateCount() > 1)
     				this.backwardIAT.add(currentTimestamp - this.backwardLastSeen);
@@ -414,7 +361,6 @@ public class Flow {
 			this.fwdPktStats.add(packet.getPayloadBytes());
 			this.flowLengthStats.add(packet.getPayloadBytes());
 			this.fwdHeaderBytes += packet.getHeaderBytes();
-    		// this.forward.add(packet);    		
     		this.forwardBytes += packet.getPayloadBytes();
     		this.forwardIAT.add(currentTimestamp - this.forwardLastSeen);
     		this.forwardLastSeen = Math.max(this.forwardLastSeen, currentTimestamp);
@@ -429,7 +375,6 @@ public class Flow {
 		long duration = this.flowLastSeen - this.flowStartTime;
 		if (duration > 0) {
 			return (calculateFwdPacketCount() / ((double) duration / 1000000L));
-			// return (this.forward.size() / ((double) duration / 1000000L));
 		} else {
 			return 0.0;
 		}
@@ -439,7 +384,6 @@ public class Flow {
 		long duration = this.flowLastSeen - this.flowStartTime;
 		if (duration > 0) {
 			return (calculateBwdPacketCount() / ((double) duration / 1000000L));
-			// return (this.backward.size() / ((double) duration / 1000000L));
 		}
 		else {
 			return 0;
@@ -449,7 +393,6 @@ public class Flow {
 	public Double calculateDownUpRatio() {
 		if (calculateFwdPacketCount() > 0) {
 			return ((double) calculateBwdPacketCount()) / calculateFwdPacketCount();
-			// return ((double) this.backward.size())/this.forward.size();
 		}
 		return 0.0;
 	}
@@ -457,7 +400,6 @@ public class Flow {
 	public Double calculateAvgPacketSize() {
 		if (calculatePacketCount() > 0) {
 			return ((double) this.flowLengthStats.calculateSum()) / calculatePacketCount();
-			// return (this.flowLengthStats.getSum() / this.packetCount());
 		}
 		return 0.0;
 	}
@@ -465,54 +407,14 @@ public class Flow {
 	public Double calculateFwdAvgSegmentSize() {
 		if (calculateFwdPacketCount() != 0)
 			return (this.fwdPktStats.calculateSum() / (double) calculateFwdPacketCount());
-			// return (this.fwdPktStats.getSum() / (double) this.forward.size());
 		return 0.0;
 	}
 
 	public Double calculateBwdAvgSegmentSize() {
 		if (calculateBwdPacketCount() != 0)
 			return (this.bwdPktStats.calculateSum() / (double) calculateBwdPacketCount());
-			// return (this.bwdPktStats.getSum() / (double) this.backward.size());
 		return 0.0;
 	}
-
-//     public void initFlags() {
-// 		flagCounts.put("FIN", new MutableInt());
-// 		flagCounts.put("SYN", new MutableInt());
-// 		flagCounts.put("RST", new MutableInt());
-// 		flagCounts.put("PSH", new MutableInt());
-// 		flagCounts.put("ACK", new MutableInt());
-// 		flagCounts.put("URG", new MutableInt());
-// 		flagCounts.put("CWR", new MutableInt());
-// 		flagCounts.put("ECE", new MutableInt());
-// 	}
-
-// 	public void checkFlags(PacketInfo packet){
-// 		if (packet.isFlagFIN()) {
-// 			flagCounts.get("FIN").increment();
-// 		}
-// 		if (packet.isFlagSYN()) {
-// 			flagCounts.get("SYN").increment();
-// 		}
-// 		if (packet.isFlagRST()) {
-// 			flagCounts.get("RST").increment();
-// 		}
-// 		if (packet.isFlagPSH()) {
-// 			flagCounts.get("PSH").increment();
-// 		}
-// 		if (packet.isFlagACK()) {
-// 			flagCounts.get("ACK").increment();
-// 		}
-// 		if (packet.isFlagURG()) {
-// 			flagCounts.get("URG").increment();
-// 		}
-// 		if (packet.isFlagCWR()) {
-// 			flagCounts.get("CWR").increment();
-// 		}
-// 		if (packet.isFlagECE()) {
-// 			flagCounts.get("ECE").increment();
-// 		}
-// 	}
 
 	public Double calculateSubflowFwdBytes() {
 		if (this.subflowCount <= 0) return 0.0;
@@ -522,30 +424,25 @@ public class Flow {
     public Double calculateSubflowFwdPackets() {
         if (this.subflowCount <= 0) return 0.0;
 		return (double) this.fwdPktStats.calculateCount() / this.subflowCount;
-        // return (double) this.forward.size() / sfCount;
     }
 
     public Double calculateSubflowBwdBytes() {
         if (this.subflowCount <= 0) return 0.0;
 		return (double) this.backwardBytes / this.subflowCount;
-        // return (double) this.backwardBytes / sfCount;
     }
 
     public Double calculateSubflowBwdPackets() {
         if (this.subflowCount <= 0) return 0.0;
 		return (double) this.bwdPktStats.calculateCount() / this.subflowCount;
-        // return (double) this.backward.size() / sfCount;
     }
 
 	void detectUpdateSubflows(PacketInfo packet) {
         if (this.subflowLastPacketTime == -1) {
             this.subflowLastPacketTime = packet.getTimeStamp();
-            // sfAcHelper = packet.getTimeStamp();
         }
         if(((packet.getTimeStamp() - this.subflowLastPacketTime) / (double) 1000000)  > 1.0){
             this.subflowCount++;
             updateActiveIdleTime(packet.getTimeStamp(), this.activityTimeout);
-            // sfAcHelper = packet.getTimeStamp();
         }
         this.subflowLastPacketTime = packet.getTimeStamp();
 	}
@@ -600,9 +497,6 @@ public class Flow {
 	}
 
 	public void updateBackwardBulk(PacketInfo packet , long lastBulkTimeInOther){
-		/*bAvgBytesPerBulk =0;
-		bbulkSizeTotal=0;
-		bbulkStateCount=0;*/
         long size = packet.getPayloadBytes();
         if (lastBulkTimeInOther > this.bwdBulkStartHelper) this.bwdBulkStartHelper = 0;
         if (size <= 0) return;
@@ -651,7 +545,6 @@ public class Flow {
     public Double calculateFwdAvgBytesPerBulk() {
         if (this.fwdBulkStateCount != 0) {
 			return ((double) this.fwdBulkSizeTotal / this.fwdBulkStateCount);
-			// return ((double) this.fbulkSizeTotal() / this.fbulkStateCount());
 		}
         return 0.0;
     }
@@ -660,7 +553,6 @@ public class Flow {
     public Double calculateFwdAvgPacketsPerBulk() {
         if (this.fwdBulkStateCount != 0) {
 			return ((double) this.fwdBulkPacketCount / this.fwdBulkStateCount);
-			// return ((double) this.fbulkPacketCount() / this.fbulkStateCount());
 		}
         return 0.0;
     }
@@ -669,7 +561,6 @@ public class Flow {
     public Double calculateFwdAvgBulkRate() {
         if (this.fwdBulkDuration != 0) {
 			return ((double) this.fwdBulkSizeTotal / calculateFwdBulkDurationInSecond());
-			// return ((double) this.fbulkSizeTotal() / this.fbulkDurationInSecond());
 		}
         return 0.0;
     }
@@ -682,7 +573,6 @@ public class Flow {
     public Double calculateBwdAvgBytesPerBulk() {
         if (this.bwdBulkStateCount != 0) {
 			return ((double) this.bwdBulkSizeTotal / this.bwdBulkStateCount);
-			// return ((double) this.bbulkSizeTotal() / this.bbulkStateCount());
 		}   
         return 0.0;
     }
@@ -691,7 +581,6 @@ public class Flow {
     public Double calculateBwdAvgPacketsPerBulk() {
         if (this.bwdBulkStateCount != 0) {
 			return ((double) this.bwdBulkPacketCount / this.bwdBulkStateCount);
-			// return ((double) this.bbulkPacketCount() / this.bbulkStateCount());
 		}   
         return 0.0;
     }
@@ -700,7 +589,6 @@ public class Flow {
     public Double calculateBwdAvgBulkRate() {
         if (this.bwdBulkDuration != 0) {
 			return ((double) this.bwdBulkSizeTotal / calculateBwdBulkDurationInSecond());
-			// return ((double) this.bbulkSizeTotal() / this.bbulkDurationInSecond());
 		}
         return 0.0;
     }
@@ -721,10 +609,8 @@ public class Flow {
     public Integer calculatePacketCount(){
     	if (this.bidirectional) {
 			return calculateFwdPacketCount() + calculateBwdPacketCount();
-    		// return (this.forward.size() + this.backward.size()); 
     	} else {
 			return calculateFwdPacketCount();
-    		// return this.forward.size();
     	}
     }
 

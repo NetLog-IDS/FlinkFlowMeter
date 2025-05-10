@@ -2,7 +2,6 @@ package id.ac.ui.cs.netlog.operators;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
 
 import org.apache.flink.api.common.state.MapState;
 import org.apache.flink.api.common.state.MapStateDescriptor;
@@ -18,7 +17,6 @@ import id.ac.ui.cs.netlog.data.cicflowmeter.optimized.Flow;
 import id.ac.ui.cs.netlog.data.cicflowmeter.PacketInfo;
 import id.ac.ui.cs.netlog.data.cicflowmeter.ProtocolEnum;
 import id.ac.ui.cs.netlog.data.cicflowmeter.TCPFlowState;
-import id.ac.ui.cs.netlog.data.cicflowmeter.TCPRetransmission;
 import id.ac.ui.cs.netlog.utils.TimeUtils;
 
 public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow> {

@@ -1,8 +1,7 @@
 package id.ac.ui.cs.netlog.modes.enums;
 
 public enum ModeEnum {
-    ORDERED("ordered"),
-    UNORDERED("unordered");
+    ORDERED("ordered");
     
     private final String value;
 
