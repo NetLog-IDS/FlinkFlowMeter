@@ -88,12 +88,8 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
     		if ((currentTimestamp - flow.getFlowStartTime()) > FLOW_TIMEOUT
 					|| ((flow.getTcpFlowState() == TCPFlowState.READY_FOR_TERMINATION) && packet.isFlagSYN())) {
 
-				// set cumulative flow time if TCP packet
-				// long currDuration = flow.getCumulativeConnectionDuration();
-				// currDuration += flow.getFlowDuration();
-				// flow.setCumulativeConnectionDuration(currDuration);
-
 				if (!flow.getSubmitted()) {
+					updateCummulativeDuration(flow);
 					out.collect(flow);
 					flow.setSubmitted(true);
 					untriggerSubmitTimer(flow, ctx);
@@ -178,10 +174,9 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
 					);
 					updateRetransmission(newFlow, packet);
 
-                    // currDuration = flow.getCumulativeConnectionDuration();
-                    // get the gap between the last flow and the start of this flow
-                    // currDuration += (currentTimestamp - flow.getLastSeen());
-                    // newFlow.setCumulativeConnectionDuration(currDuration);
+                    long curDuration = flow.getCummulativeConnectionDuration();
+                    curDuration += (currentTimestamp - flow.getFlowLastSeen()); // get the gap between the last flow and the start of this flow
+                    newFlow.setCummulativeConnectionDuration(curDuration);
                 }
 				triggerTimer(newFlow, ctx);
 				flowState.update(newFlow);
@@ -214,6 +209,7 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
 				updateRetransmission(flow, packet);
                 flow.addPacket(packet);
 				flow.setTcpFlowState(TCPFlowState.READY_FOR_TERMINATION);
+				updateCummulativeDuration(flow);
 				out.collect(flow);
 				flow.setSubmitted(true);
 				untriggerSubmitTimer(flow, ctx);
@@ -226,6 +222,7 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
                 // Final ack packet for TCP flow termination
                 if (flow.getTcpFlowState() == TCPFlowState.SECOND_FIN_FLAG_RECEIVED) {
                     flow.setTcpFlowState(TCPFlowState.READY_FOR_TERMINATION);
+					updateCummulativeDuration(flow);
 					out.collect(flow);
 					flow.setSubmitted(true);
 					untriggerSubmitTimer(flow, ctx);
@@ -288,6 +285,12 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
 		}
 	}
 
+	private void updateCummulativeDuration(Flow flow) {
+		long curDuration = flow.getCummulativeConnectionDuration();
+		curDuration += flow.getFlowLastSeen() - flow.getFlowStartTime();
+		flow.setCummulativeConnectionDuration(curDuration);
+	}
+
 	private void triggerTimer(Flow flow, KeyedProcessFunction<String, PacketInfo, Flow>.Context ctx) throws Exception {
 		long submitTriggerTime = ctx.timerService().currentProcessingTime() + (FLOW_TIMEOUT / 1000L) + 100; // 100 milliseconds grace
 		ctx.timerService().registerProcessingTimeTimer(submitTriggerTime);
@@ -311,6 +314,7 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
 		if (flow == null) return;
 
 		if (!flow.getSubmitted()) { // submit
+			updateCummulativeDuration(flow);
 			out.collect(flow);
 			flow.setSubmitted(true);
 

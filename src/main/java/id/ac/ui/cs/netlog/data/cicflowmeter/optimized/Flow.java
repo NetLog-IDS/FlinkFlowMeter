@@ -101,6 +101,8 @@ public class Flow {
     //To keep track of TCP connection teardown, or an RST packet in one direction.
     private TCPFlowState tcpFlowState;
 
+	private long cummulativeConnectionDuration;
+
 	public Flow(
 			long processStartTime,
 			boolean bidirectional,

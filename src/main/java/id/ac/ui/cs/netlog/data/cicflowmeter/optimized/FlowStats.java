@@ -185,16 +185,10 @@ public class FlowStats {
         }
         
         // Flow IAT
-        // TODO: check for NaN handling
-        // TODO: get to calculate
         this.flowIatMean = flow.getFlowIAT().calculateAvg();
         this.flowIatStd = flow.getFlowIAT().calculateStd();
         this.flowIatMax = flow.getFlowIAT().calculateMax().equals(Long.MIN_VALUE) ? 0 : flow.getFlowIAT().calculateMax();
         this.flowIatMin = flow.getFlowIAT().calculateMin().equals(Long.MAX_VALUE) ? 0 : flow.getFlowIAT().calculateMin();
-        // this.flowIatMean = Double.isNaN(flow.getFlowIAT().getMean()) ? 0 : flow.getFlowIAT().getMean();
-        // this.flowIatStd = Double.isNaN(flow.getFlowIAT().getStandardDeviation()) ? 0 : flow.getFlowIAT().getStandardDeviation();
-        // this.flowIatMax = Double.isNaN(flow.getFlowIAT().getMax()) ? 0 : flow.getFlowIAT().getMax();
-        // this.flowIatMin = Double.isNaN(flow.getFlowIAT().getMin()) ? 0 : flow.getFlowIAT().getMin();
         
         // Forward IAT
         if (flow.calculateFwdPacketCount() > 1) {
@@ -293,13 +287,10 @@ public class FlowStats {
             this.idleMin = flow.getFlowIdle().calculateMin();
         }
 
-        // this.icmpCode = flow.getIcmpCode();
-        // this.icmpType = flow.getIcmpType();
-
         this.fwdTCPRetransCount = flow.getFwdTcpRetransCnt();
         this.bwdTCPRetransCount = flow.getBwdTcpRetransCnt();
         this.totalTCPRetransCount = this.fwdTCPRetransCount + this.bwdTCPRetransCount;
 
-        // this.cummConnectionTime = flow.getCumulativeConnectionDuration();
+        this.cummConnectionTime = flow.getCummulativeConnectionDuration();
     }
 }
