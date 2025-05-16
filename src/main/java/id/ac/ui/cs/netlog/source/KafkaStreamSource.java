@@ -1,5 +1,7 @@
 package id.ac.ui.cs.netlog.source;
 
+import java.time.Duration;
+
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.connector.kafka.source.KafkaSource;
@@ -16,10 +18,12 @@ public class KafkaStreamSource implements StreamSource {
     private static final String KAFKA_SERVERS = "source-servers";
 	private static final String KAFKA_TOPIC = "source-topic";
 	private static final String GROUP_ID = "source-group";
+	private static final String WATERMARK_STRATEGY = "watermark-strategy";
 
     private final String servers;
     private final String topic;
     private final String groupId;
+	private final String watermarkStrategy;
 	private final StreamExecutionEnvironment env;
 	private final ObjectMapper objectMapper;
 
@@ -27,6 +31,7 @@ public class KafkaStreamSource implements StreamSource {
         this.servers = parameters.get(KAFKA_SERVERS, "localhost:9200");
         this.topic = parameters.get(KAFKA_TOPIC, "network-traffic");
 		this.groupId = parameters.get(GROUP_ID, "flink-1");
+		this.watermarkStrategy = parameters.get(WATERMARK_STRATEGY, "monotonous");
 		this.env = env;
 		this.objectMapper = objectMapper;
     }
@@ -40,11 +45,15 @@ public class KafkaStreamSource implements StreamSource {
 			.setStartingOffsets(OffsetsInitializer.earliest())
 			.setValueOnlyDeserializer(new PacketDeserializationSchema(this.objectMapper))
 			.build();
-		
-		return env.fromSource(source, WatermarkStrategy.noWatermarks(), "Kafka Source")
-				.assignTimestampsAndWatermarks(
-					WatermarkStrategy.<Packet>forMonotonousTimestamps()
-					.withTimestampAssigner((event, timestamp) -> (event.getTimestamp() / 1000L))
-				);
+
+		WatermarkStrategy<Packet> watermark = WatermarkStrategy.<Packet>forMonotonousTimestamps();
+		if (this.watermarkStrategy.equals("bounded")) {
+			System.out.println("[STRATEGY] Bounded Chosen");
+			watermark = WatermarkStrategy.<Packet>forBoundedOutOfOrderness(Duration.ofSeconds(5));
+		} else {
+			System.out.println("[STRATEGY] Monotonous Chosen");
+		}
+		watermark = watermark.withTimestampAssigner((event, timestamp) -> (event.getTimestamp() / 1000L));
+		return env.fromSource(source, watermark, "Kafka Source");
 	}
 }

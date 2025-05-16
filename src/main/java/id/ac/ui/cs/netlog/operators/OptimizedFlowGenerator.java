@@ -292,20 +292,21 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
 	}
 
 	private void triggerTimer(Flow flow, KeyedProcessFunction<String, PacketInfo, Flow>.Context ctx) throws Exception {
-		long submitTriggerTime = ctx.timerService().currentProcessingTime() + (FLOW_TIMEOUT / 1000L) + 100; // 100 milliseconds grace
-		ctx.timerService().registerProcessingTimeTimer(submitTriggerTime);
-		long clearanceTriggerTime = ctx.timerService().currentProcessingTime() + 2 * (FLOW_TIMEOUT / 1000L) + 100; // 100 milliseconds grace
-		ctx.timerService().registerProcessingTimeTimer(clearanceTriggerTime);
+		long submitTriggerTime = (flow.getFlowStartTime() / 1000L) + (FLOW_TIMEOUT / 1000L);
+		ctx.timerService().registerEventTimeTimer(submitTriggerTime);
+		long clearanceTriggerTime = (flow.getFlowStartTime() / 1000L) + 2 * (FLOW_TIMEOUT / 1000L);
+		ctx.timerService().registerEventTimeTimer(clearanceTriggerTime);
+
 		flow.setTimerDeadline(submitTriggerTime);
 		flow.setClearanceDeadline(clearanceTriggerTime);
 	}
 
 	private void untriggerSubmitTimer(Flow flow, KeyedProcessFunction<String, PacketInfo, Flow>.Context ctx) throws Exception {
-		ctx.timerService().deleteProcessingTimeTimer(flow.getTimerDeadline());
+		ctx.timerService().deleteEventTimeTimer(flow.getTimerDeadline());
 	}
 
 	private void untriggerClearanceTimer(Flow flow, KeyedProcessFunction<String, PacketInfo, Flow>.Context ctx) throws Exception {
-		ctx.timerService().deleteProcessingTimeTimer(flow.getClearanceDeadline());
+		ctx.timerService().deleteEventTimeTimer(flow.getClearanceDeadline());
 	}
 
 	@Override
