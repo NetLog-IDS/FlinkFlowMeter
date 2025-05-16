@@ -513,7 +513,7 @@ public class Flow {
         if (tsOflastBulkInOther > fbulkStartHelper) fbulkStartHelper = 0;
         if (size <= 0) return;
 
-        packet.getPayloadPacket();
+        packet.incrementPayloadPacket();
 
         if (fbulkStartHelper == 0) {
             fbulkStartHelper = packet.getTimeStamp();
@@ -557,7 +557,7 @@ public class Flow {
         if (tsOflastBulkInOther > bbulkStartHelper) bbulkStartHelper = 0;
         if (size <= 0) return;
 
-        packet.getPayloadPacket();
+        packet.incrementPayloadPacket();
 
         if (bbulkStartHelper == 0) {
             bbulkStartHelper = packet.getTimeStamp();

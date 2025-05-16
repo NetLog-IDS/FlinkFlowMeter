@@ -465,7 +465,7 @@ public class Flow {
         if (lastBulkTimeInOther > this.fwdBulkStartHelper) this.fwdBulkStartHelper = 0;
         if (size <= 0) return;
 
-        packet.getPayloadPacket();
+        packet.incrementPayloadPacket();
 
         if (this.fwdBulkStartHelper == 0) {
             this.fwdBulkStartHelper = packet.getTimeStamp();
@@ -506,7 +506,7 @@ public class Flow {
         if (lastBulkTimeInOther > this.bwdBulkStartHelper) this.bwdBulkStartHelper = 0;
         if (size <= 0) return;
 
-        packet.getPayloadPacket();
+        packet.incrementPayloadPacket();
 
         if (this.bwdBulkStartHelper == 0) {
             this.bwdBulkStartHelper = packet.getTimeStamp();
