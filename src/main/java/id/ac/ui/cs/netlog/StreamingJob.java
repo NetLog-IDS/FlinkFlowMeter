@@ -71,7 +71,7 @@ public class StreamingJob {
 			}
 		});
 		env.setStateBackend(backend);
-		env.enableCheckpointing(10000);
+		env.enableCheckpointing(100000);
 
 		String sourceString = parameters.get(SOURCE_TYPE, StreamSourceEnum.SOCKET.toString());
 		String sinkString = parameters.get(SINK_TYPE, StreamSinkEnum.PRINT.toString());

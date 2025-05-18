@@ -16,6 +16,7 @@ public class FlowStats {
     private int protocol;          // Protocol
     private String timestamp;       // Timestamp
     private String sniffStartTime; // Sniff Start Time
+    private String sniffStartTimeMax;
 
     // Basic Flow Statistics
     private double flowDuration;    // Flow Duration
@@ -149,6 +150,7 @@ public class FlowStats {
         // Timestamp
         this.timestamp = DateUtils.convertEpochTimestamp2String(flow.getFlowStartTime());
         this.sniffStartTime = DateUtils.convertEpochTimestamp2String(flow.getSniffStartTime());
+        this.sniffStartTimeMax = DateUtils.convertEpochTimestamp2String(flow.getSniffStartTimeMax());
         
         // Flow duration
         this.flowDuration = flow.getFlowLastSeen() - flow.getFlowStartTime();
