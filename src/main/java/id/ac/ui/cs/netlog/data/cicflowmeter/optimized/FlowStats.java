@@ -15,8 +15,10 @@ public class FlowStats {
     private int dstPort;           // Destination Port
     private int protocol;          // Protocol
     private String timestamp;       // Timestamp
-    private String sniffStartTime; // Sniff Start Time
-    private String sniffStartTimeMax;
+    private long sniffStartTime; // Sniff Start Time
+    private long sniffStartTimeMax; // Sniff Start Time Max
+    private double sniffStartTimeAvg; // Sniff Start Time Avg
+    private long preprocessEndTime;
 
     // Basic Flow Statistics
     private double flowDuration;    // Flow Duration
@@ -149,8 +151,10 @@ public class FlowStats {
         
         // Timestamp
         this.timestamp = DateUtils.convertEpochTimestamp2String(flow.getFlowStartTime());
-        this.sniffStartTime = DateUtils.convertEpochTimestamp2String(flow.getSniffStartTime());
-        this.sniffStartTimeMax = DateUtils.convertEpochTimestamp2String(flow.getSniffStartTimeMax());
+        this.sniffStartTime = flow.getSniffStartTimeStats().calculateMin();
+        this.sniffStartTimeMax = flow.getSniffStartTimeStats().calculateMax();
+        this.sniffStartTimeAvg = flow.getSniffStartTimeStats().calculateAvg();
+        this.preprocessEndTime = System.currentTimeMillis() * 1000L;
         
         // Flow duration
         this.flowDuration = flow.getFlowLastSeen() - flow.getFlowStartTime();

@@ -13,8 +13,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class Flow {
 	private Long processStartTime;
-    private Long sniffStartTime;
-	private Long sniffStartTimeMax;
+	private Statistics sniffStartTimeStats;
 	private Long timerDeadline;
 	private Long clearanceDeadline;
 	private Boolean submitted = false;
@@ -145,6 +144,7 @@ public class Flow {
 	}
 	
 	public void initParameters() {
+		this.sniffStartTimeStats = new Statistics();
 		this.flowIAT = new Statistics();
 		this.forwardIAT = new Statistics();
 		this.backwardIAT = new Statistics();
@@ -197,8 +197,7 @@ public class Flow {
 		
 		this.endActiveTime = packet.getTimeStamp();
 		this.flowStartTime = packet.getTimeStamp();
-        this.sniffStartTime = packet.getSniffTime();
-		this.sniffStartTimeMax = packet.getSniffTime();
+		this.sniffStartTimeStats.add(packet.getSniffTime());
 		this.flowLastSeen = packet.getTimeStamp();
 		this.startActiveTime = packet.getTimeStamp();
 		detectUpdateSubflows(packet);
@@ -375,7 +374,7 @@ public class Flow {
     	}
 
     	this.flowIAT.add(packet.getTimeStamp() - this.flowLastSeen);
-		this.sniffStartTimeMax = Math.max(this.sniffStartTimeMax, packet.getSniffTime());
+		this.sniffStartTimeStats.add(packet.getSniffTime());
     	this.flowLastSeen = Math.max(this.flowLastSeen, packet.getTimeStamp());
     }
 
