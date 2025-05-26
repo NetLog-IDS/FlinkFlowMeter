@@ -11,6 +11,7 @@ import id.ac.ui.cs.netlog.data.packets.Packet;
 import id.ac.ui.cs.netlog.data.packets.TCP;
 import id.ac.ui.cs.netlog.data.packets.UDP;
 import id.ac.ui.cs.netlog.utils.PacketUtils;
+import id.ac.ui.cs.netlog.utils.TimeUtils;
 
 public class ExtractPacketInfo implements FlatMapFunction<Packet, PacketInfo> {
 	@Override
@@ -37,6 +38,7 @@ public class ExtractPacketInfo implements FlatMapFunction<Packet, PacketInfo> {
 				packetInfo.setPublisherId(packet.getPublisherId());
 				packetInfo.setTimeStamp(packet.getTimestamp());
 				packetInfo.setSniffTime(packet.getSniffTime());
+				packetInfo.setArrivalTime(TimeUtils.getCurrentTimeMicro());
 
 				if (packetLayer.getTransport() instanceof TCP) {
                     TCP tcp = (TCP) packetLayer.getTransport();

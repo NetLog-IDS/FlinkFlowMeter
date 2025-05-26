@@ -2,7 +2,7 @@ package id.ac.ui.cs.netlog.data.cicflowmeter.optimized;
 
 import id.ac.ui.cs.netlog.utils.DateUtils;
 import id.ac.ui.cs.netlog.utils.PacketUtils;
-
+import id.ac.ui.cs.netlog.utils.TimeUtils;
 import lombok.Data;
 
 @Data
@@ -19,6 +19,7 @@ public class FlowStats {
     private long sniffStartTimeMax; // Sniff Start Time Max
     private double sniffStartTimeAvg; // Sniff Start Time Avg
     private long preprocessEndTime;
+    private long firstArrivalTime;
 
     // Basic Flow Statistics
     private double flowDuration;    // Flow Duration
@@ -154,7 +155,8 @@ public class FlowStats {
         this.sniffStartTime = flow.getSniffStartTimeStats().calculateMin();
         this.sniffStartTimeMax = flow.getSniffStartTimeStats().calculateMax();
         this.sniffStartTimeAvg = flow.getSniffStartTimeStats().calculateAvg();
-        this.preprocessEndTime = System.currentTimeMillis() * 1000L;
+        this.preprocessEndTime = TimeUtils.getCurrentTimeMicro();
+        this.firstArrivalTime = flow.getFirstArrivalTime();
         
         // Flow duration
         this.flowDuration = flow.getFlowLastSeen() - flow.getFlowStartTime();

@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 public class Flow {
+	private Long firstArrivalTime;
 	private Long processStartTime;
 	private Statistics sniffStartTimeStats;
 	private Long timerDeadline;
@@ -197,6 +198,7 @@ public class Flow {
 		
 		this.endActiveTime = packet.getTimeStamp();
 		this.flowStartTime = packet.getTimeStamp();
+		this.firstArrivalTime = packet.getArrivalTime();
 		this.sniffStartTimeStats.add(packet.getSniffTime());
 		this.flowLastSeen = packet.getTimeStamp();
 		this.startActiveTime = packet.getTimeStamp();
