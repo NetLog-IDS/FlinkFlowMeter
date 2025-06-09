@@ -10,7 +10,7 @@ import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
+import org.apache.flink.streaming.api.functions.ProcessFunction;
 import org.apache.flink.util.Collector;
 
 import id.ac.ui.cs.netlog.data.cicflowmeter.optimized.Flow;
@@ -19,7 +19,7 @@ import id.ac.ui.cs.netlog.data.cicflowmeter.ProtocolEnum;
 import id.ac.ui.cs.netlog.data.cicflowmeter.TCPFlowState;
 import id.ac.ui.cs.netlog.utils.TimeUtils;
 
-public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketInfo, Flow> {
+public class OptimizedFlowGenerator extends ProcessFunction<PacketInfo, Flow> {
     //total 85 colums
 	/*public static final String timeBasedHeader = "Flow ID, Source IP, Source Port, Destination IP, Destination Port, Protocol, "
 			+ "Timestamp, Flow Duration, Total Fwd Packets, Total Backward Packets,"
@@ -70,7 +70,7 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
 
 	@Override
     public void processElement(PacketInfo packet,
-            KeyedProcessFunction<String, PacketInfo, Flow>.Context ctx, Collector<Flow> out)
+            ProcessFunction<PacketInfo, Flow>.Context ctx, Collector<Flow> out)
             throws Exception {
         if (packet == null) return;
 		if (!TCP_UDP_LIST_FILTER.contains(packet.getProtocol())) return;
@@ -291,7 +291,7 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
 		flow.setCummulativeConnectionDuration(curDuration);
 	}
 
-	private void triggerTimer(Flow flow, KeyedProcessFunction<String, PacketInfo, Flow>.Context ctx) throws Exception {
+	private void triggerTimer(Flow flow, ProcessFunction<PacketInfo, Flow>.Context ctx) throws Exception {
 		long submitTriggerTime = (flow.getFlowStartTime() / 1000L) + (FLOW_TIMEOUT / 1000L);
 		ctx.timerService().registerEventTimeTimer(submitTriggerTime);
 		long clearanceTriggerTime = (flow.getFlowStartTime() / 1000L) + 2 * (FLOW_TIMEOUT / 1000L);
@@ -301,11 +301,11 @@ public class OptimizedFlowGenerator extends KeyedProcessFunction<String, PacketI
 		flow.setClearanceDeadline(clearanceTriggerTime);
 	}
 
-	private void untriggerSubmitTimer(Flow flow, KeyedProcessFunction<String, PacketInfo, Flow>.Context ctx) throws Exception {
+	private void untriggerSubmitTimer(Flow flow, ProcessFunction<PacketInfo, Flow>.Context ctx) throws Exception {
 		ctx.timerService().deleteEventTimeTimer(flow.getTimerDeadline());
 	}
 
-	private void untriggerClearanceTimer(Flow flow, KeyedProcessFunction<String, PacketInfo, Flow>.Context ctx) throws Exception {
+	private void untriggerClearanceTimer(Flow flow, ProcessFunction<PacketInfo, Flow>.Context ctx) throws Exception {
 		ctx.timerService().deleteEventTimeTimer(flow.getClearanceDeadline());
 	}
 
