@@ -8,7 +8,7 @@ import org.apache.flink.streaming.api.datastream.DataStreamSink;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import id.ac.ui.cs.netlog.data.cicflowmeter.FlowStats;
+import id.ac.ui.cs.netlog.data.cicflowmeter.optimized.FlowStats;
 import id.ac.ui.cs.netlog.serialization.serializers.ObjectSerializer;
 
 public class KafkaStreamSink implements StreamSink {

@@ -129,7 +129,7 @@ public class PacketInfo {
 		return null;
 	}
 
-	public Integer getPayloadPacket() {
+	public Integer incrementPayloadPacket() {
 		return payloadPacket += 1;
 	}
     

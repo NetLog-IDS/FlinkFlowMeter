@@ -1,6 +1,7 @@
 package id.ac.ui.cs.netlog.operators;
 
-import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.functions.FlatMapFunction;
+import org.apache.flink.util.Collector;
 
 import id.ac.ui.cs.netlog.data.cicflowmeter.PacketInfo;
 import id.ac.ui.cs.netlog.data.cicflowmeter.ProtocolEnum;
@@ -10,11 +11,16 @@ import id.ac.ui.cs.netlog.data.packets.Packet;
 import id.ac.ui.cs.netlog.data.packets.TCP;
 import id.ac.ui.cs.netlog.data.packets.UDP;
 import id.ac.ui.cs.netlog.utils.PacketUtils;
+import id.ac.ui.cs.netlog.utils.TimeUtils;
 
-public class ExtractPacketInfo implements MapFunction<Packet, PacketInfo> {
+public class ExtractPacketInfo implements FlatMapFunction<Packet, PacketInfo> {
 	@Override
-	public PacketInfo map(Packet packet) {
-		return this.getIpv4Info(packet);
+	public void flatMap(Packet packet, Collector<PacketInfo> out) throws Exception {
+		PacketInfo packetInfo = this.getIpv4Info(packet);
+		if (packetInfo == null) {
+			return;
+		}
+		out.collect(packetInfo);
 	}
 
 	private PacketInfo getIpv4Info(Packet packet) {
@@ -32,6 +38,7 @@ public class ExtractPacketInfo implements MapFunction<Packet, PacketInfo> {
 				packetInfo.setPublisherId(packet.getPublisherId());
 				packetInfo.setTimeStamp(packet.getTimestamp());
 				packetInfo.setSniffTime(packet.getSniffTime());
+				packetInfo.setArrivalTime(TimeUtils.getCurrentTimeMicro());
 
 				if (packetLayer.getTransport() instanceof TCP) {
                     TCP tcp = (TCP) packetLayer.getTransport();
@@ -69,7 +76,7 @@ public class ExtractPacketInfo implements MapFunction<Packet, PacketInfo> {
 				}
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
+			return null;
 		}
 		return packetInfo;
 	}
