@@ -14,10 +14,13 @@
     - `utils`: Helper class/functions.
     - `StreamingJob.java`: Job declaration class.
 
+## Building
+To build the `.jar` file for FlinkFlowMeter, run `mvn clean install` on the root. After that, the built `.jar` can be found at `target/flinkflowmeter-0.5.6.jar`.
+
 ## Running
 - First, run Apache Flink using commands on [infrastructure repository](https://github.com/NetLog-IDS/infrastructure).
 - After running, go to the UI at `http://<jobmanager-ip>:<jobmanager-port>` (usually port 8082).
-- Submit the `.jar` file of FlinkFlowMeter.
+- Submit the built `.jar` file of FlinkFlowMeter.
 - Run the job with configuration below:
 
     ```
